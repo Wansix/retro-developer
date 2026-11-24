@@ -176,9 +176,92 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   border-bottom-right-radius: 2px;
 }
 
-#intro-buttons {
+#intro-buttons, #buttons-2006 {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
-#intro-buttons .btn { margin-top: 0; text-align: left; }
+#intro-buttons .btn, #buttons-2006 .btn { margin-top: 0; text-align: left; }
+
+/* 짜증 단계: 플레이어 말풍선이 점점 붉어지고 떨린다 */
+#screen-intro.anger-1 .bubble.player { background: #4a3a1a; }
+#screen-intro.anger-2 .bubble.player { background: #5a2a1a; animation: pop 0.2s ease-out, shake 0.3s ease-in-out; }
+#screen-intro.anger-3 .bubble.player { background: #6a1a1a; color: #ffd8c8; animation: pop 0.2s ease-out, shake 0.2s ease-in-out 2; }
+#screen-intro.anger-3 .terminal { border-color: #7a3a2a; box-shadow: 0 0 40px rgba(220, 80, 50, 0.25); }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+
+/* 시간 이동: 글리치 + 터미널 */
+#screen-travel { background: #000; }
+#travel-box {
+  position: relative;
+  max-width: 640px;
+  width: 100%;
+  padding: 2rem;
+  border: 1px solid #2a3a24;
+  animation: glitch 0.25s steps(2) infinite;
+}
+#travel-box::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, rgba(120, 255, 120, 0.05) 0 2px, transparent 2px 4px);
+  pointer-events: none;
+}
+@keyframes glitch {
+  0% { transform: translate(0, 0); filter: none; }
+  25% { transform: translate(-3px, 2px); filter: hue-rotate(40deg); }
+  50% { transform: translate(3px, -2px); filter: none; }
+  75% { transform: translate(-2px, -1px); filter: hue-rotate(-40deg); }
+  100% { transform: translate(0, 0); }
+}
+#travel-log {
+  color: #6fc040;
+  font-size: 1.05rem;
+  line-height: 2;
+  min-height: 9rem;
+  text-shadow: 0 0 8px rgba(120, 220, 80, 0.6);
+}
+
+/* 2006년: 낡은 사무실 (베이지 + CRT 느낌) */
+.terminal.retro {
+  background: #cfc5a2;
+  border: 3px ridge #8a7f5a;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.4);
+}
+.terminal.retro .line.dim { color: #6a5f3a; }
+.terminal.retro .bubble.boss {
+  align-self: flex-start;
+  background: #b8ab84;
+  border: 1px solid #8a7f5a;
+  color: #3a3423;
+  border-bottom-left-radius: 2px;
+}
+.terminal.retro .bubble.player {
+  background: #7a8a9a;
+  color: #f0f0e8;
+}
+/* 모니터에 뜬 미래의 AI 메시지: 초록 CRT */
+.terminal.retro .bubble.ai {
+  background: #0d140c;
+  border: 1px solid #3a5a24;
+  color: #6fc040;
+  text-shadow: 0 0 6px rgba(120, 220, 80, 0.5);
+}
+.terminal.retro .btn { background: #b8ab84; color: #3a3423; border-color: #8a7f5a; }
+.terminal.retro .btn:hover { background: #a89a72; }
+
+/* 타이틀 카드 */
+#screen-titlecard { background: #0d140c; }
+.titlecard { text-align: center; }
+.bigtitle {
+  font-size: 3rem;
+  color: #8fd05a;
+  text-shadow: 0 0 20px rgba(120, 220, 80, 0.5);
+  animation: pop 0.4s ease-out;
+}
+.tagline { color: #d8e0c8; margin-top: 0.8rem; font-size: 1.1rem; }
+.tagline2 { color: #6a7a58; margin-top: 0.4rem; }

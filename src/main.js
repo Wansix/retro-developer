@@ -18,57 +18,76 @@ function show(id) {
   document.getElementById(id).classList.add("active");
 }
 
-// --- 인트로: AI와 설전 ---
-let introRound = 0;
-
-function addChat(text, who) {
-  const log = document.getElementById("chat-log");
+// --- 프롤로그: 스크립트 러너 ---
+// steps의 'me' 대사는 플레이어가 직접 누르고, 'ai'/'boss' 대사는 자동으로 진행된다.
+function addChatTo(logId, text, who) {
+  const log = document.getElementById(logId);
   const div = document.createElement("div");
-  div.className = `bubble ${who}`;
+  div.className = `bubble ${who === "me" ? "player" : who}`;
   div.textContent = text;
   log.appendChild(div);
   div.scrollIntoView({ behavior: "smooth", block: "end" });
 }
 
-function setIntroButtons(labels, onPick) {
-  const box = document.getElementById("intro-buttons");
-  box.innerHTML = "";
-  labels.forEach((label, i) => {
-    const b = document.createElement("button");
-    b.className = "btn";
-    b.textContent = label;
-    b.onclick = () => onPick(i);
-    box.appendChild(b);
-  });
+function runScript(steps, logId, btnsId, onDone, onAnger) {
+  let i = 0;
+  let meCount = 0;
+  const box = document.getElementById(btnsId);
+
+  function next() {
+    if (i >= steps.length) { onDone(); return; }
+    const step = steps[i++];
+    if (step.who === "me") {
+      box.innerHTML = "";
+      const b = document.createElement("button");
+      b.className = "btn";
+      b.textContent = step.text;
+      b.onclick = () => {
+        box.innerHTML = "";
+        addChatTo(logId, step.text, "me");
+        meCount++;
+        if (onAnger) onAnger(meCount);
+        setTimeout(next, 500);
+      };
+      box.appendChild(b);
+    } else {
+      setTimeout(() => {
+        addChatTo(logId, step.text, step.who);
+        next();
+      }, 900);
+    }
+  }
+  next();
 }
 
-function playIntro() {
-  const round = INTRO_ROUNDS[introRound];
-  const buttons = document.getElementById("intro-buttons");
-  if (!round) return;
+// 대사가 진행될수록 짜증이 커지는 연출 (1~3단계)
+function escalateAnger(meCount) {
+  const level = Math.min(3, Math.ceil(meCount / 2));
+  const screen = document.getElementById("screen-intro");
+  screen.classList.remove("anger-1", "anger-2", "anger-3");
+  screen.classList.add(`anger-${level}`);
+}
 
-  addChat(round.ai, "ai");
+function startTravel() {
+  show("screen-travel");
+  const log = document.getElementById("travel-log");
+  log.textContent = "";
+  let i = 0;
+  const iv = setInterval(() => {
+    if (i >= TRAVEL_LINES.length) {
+      clearInterval(iv);
+      setTimeout(enter2006, 900);
+      return;
+    }
+    log.textContent += TRAVEL_LINES[i++] + "\n";
+  }, 750);
+}
 
-  if (round.final) {
-    setIntroButtons([round.final], () => {
-      buttons.innerHTML = "";
-      addChat(round.final, "player");
-      setTimeout(() => {
-        addChat(round.after, "ai");
-        setIntroButtons(["...뭐야?!"], enterOffice);
-      }, 700);
-    });
-    return;
-  }
-
-  setIntroButtons(round.choices.map((c) => c.player), (i) => {
-    buttons.innerHTML = "";
-    addChat(round.choices[i].player, "player");
-    setTimeout(() => {
-      addChat(round.choices[i].ai, "ai");
-      introRound++;
-      setTimeout(playIntro, 500);
-    }, 600);
+function enter2006() {
+  show("screen-2006");
+  document.getElementById("chat-log-2006").innerHTML = "";
+  runScript(SCENE_2006, "chat-log-2006", "buttons-2006", () => {
+    setTimeout(() => show("screen-titlecard"), 900);
   });
 }
 
@@ -220,10 +239,12 @@ function onPasteAttempt(e) {
 // --- 시작 ---
 document.getElementById("btn-start").onclick = () => {
   show("screen-intro");
-  introRound = 0;
   document.getElementById("chat-log").innerHTML = "";
-  playIntro();
+  document.getElementById("screen-intro").classList.remove("anger-1", "anger-2", "anger-3");
+  runScript(PROLOGUE_2026, "chat-log", "intro-buttons", startTravel, escalateAnger);
 };
+
+document.getElementById("btn-gotowork").onclick = enterOffice;
 
 const editor = document.getElementById("editor");
 editor.addEventListener("paste", onPasteAttempt);
