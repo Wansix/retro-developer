@@ -1,0 +1,138 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #1a2418;
+  color: #d8e0c8;
+  font-family: "Courier New", monospace;
+  min-height: 100vh;
+}
+
+.screen { display: none; min-height: 100vh; }
+.screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem; }
+
+.terminal {
+  background: #0d140c;
+  border: 2px solid #4a5d3a;
+  border-radius: 8px;
+  max-width: 720px;
+  width: 100%;
+  padding: 2rem;
+  box-shadow: 0 0 40px rgba(120, 200, 80, 0.15);
+}
+
+h1 { color: #8fd05a; font-size: 2rem; margin-bottom: 0.5rem; }
+h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
+.sub { color: #a8b890; margin-bottom: 1.5rem; }
+.line { color: #6fc040; line-height: 1.8; white-space: pre-wrap; }
+.line::before { content: "> "; color: #4a7a30; }
+.dim { color: #6a7a58; }
+.dim::before { content: ""; }
+
+.btn {
+  margin-top: 1.5rem;
+  padding: 0.6rem 1.4rem;
+  background: #24301e;
+  color: #8fd05a;
+  border: 1px solid #4a5d3a;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.btn:hover { background: #31422a; }
+.btn.primary { background: #3a5a24; color: #e8f0d8; }
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+/* 사무실 */
+#screen-office.active { justify-content: flex-start; gap: 0.8rem; }
+
+#statusbar {
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  background: #0d140c;
+  border: 2px solid #4a5d3a;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  color: #8fd05a;
+  font-size: 0.95rem;
+}
+
+#office-main {
+  width: 100%;
+  max-width: 1100px;
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 0.8rem;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  #office-main { grid-template-columns: 1fr; }
+}
+
+#brief-panel {
+  background: #d8cfae;
+  color: #3a3423;
+  border: 2px solid #4a5d3a;
+  border-radius: 6px;
+  padding: 1rem;
+  min-height: 300px;
+}
+#brief-panel .speaker { font-weight: bold; color: #5a4a1a; margin-bottom: 0.4rem; }
+#brief-panel h2 { color: #3a5a24; }
+#brief-panel p { line-height: 1.6; margin-bottom: 0.6rem; white-space: pre-wrap; }
+#brief-panel hr { border: none; border-top: 1px dashed #8a7f5a; margin: 0.8rem 0; }
+
+#work-panel {
+  background: #0d140c;
+  border: 2px solid #4a5d3a;
+  border-radius: 6px;
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.editor-head {
+  display: flex;
+  justify-content: space-between;
+  color: #6a7a58;
+  font-size: 0.85rem;
+}
+.warn { color: #d08a4a; }
+
+#editor {
+  width: 100%;
+  min-height: 220px;
+  background: #060a05;
+  color: #b8e080;
+  border: 1px solid #3a4a2e;
+  border-radius: 4px;
+  padding: 0.8rem;
+  font-family: "Courier New", monospace;
+  font-size: 1rem;
+  line-height: 1.5;
+  resize: vertical;
+  tab-size: 4;
+}
+#editor:focus { outline: 1px solid #6fc040; }
+
+.actions { display: flex; gap: 0.6rem; }
+.actions .btn { margin-top: 0; }
+
+#output {
+  background: #060a05;
+  border: 1px solid #3a4a2e;
+  border-radius: 4px;
+  padding: 0.8rem;
+  min-height: 90px;
+  color: #9fd070;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+#output.error { color: #d07070; }
+#output.ok { color: #8fd05a; }
+
+.hidden { display: none; }

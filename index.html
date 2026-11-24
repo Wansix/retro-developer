@@ -4,54 +4,66 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>옛날 개발자 — 퇴근하고 싶다</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #1a2418;
-    color: #d8e0c8;
-    font-family: "Courier New", monospace;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-  }
-  .terminal {
-    background: #0d140c;
-    border: 2px solid #4a5d3a;
-    border-radius: 8px;
-    max-width: 720px;
-    width: 100%;
-    padding: 2rem;
-    box-shadow: 0 0 40px rgba(120, 200, 80, 0.15);
-  }
-  h1 { color: #8fd05a; font-size: 2rem; margin-bottom: 0.5rem; }
-  .sub { color: #a8b890; margin-bottom: 1.5rem; }
-  .line { color: #6fc040; line-height: 1.8; }
-  .line::before { content: "> "; color: #4a7a30; }
-  .blink { animation: blink 1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
-  .badge {
-    display: inline-block;
-    margin-top: 1.5rem;
-    padding: 0.4rem 0.8rem;
-    border: 1px solid #4a5d3a;
-    color: #a8b890;
-    font-size: 0.85rem;
-  }
-  a { color: #8fd05a; }
-</style>
+<link rel="stylesheet" href="src/style.css">
 </head>
 <body>
-  <main class="terminal">
-    <h1>《옛날 개발자》</h1>
-    <p class="sub">퇴근하고 싶다 — 코딩은 입문 난이도, 직장생활은 하드코어</p>
-    <p class="line">2006년 3월, 미래소프트™에 오신 것을 환영합니다.</p>
-    <p class="line">AI 코딩 지원 없이 납기 안에 프로젝트를 완성하세요.</p>
-    <p class="line">골든 키보드상이 당신을 기다립니다.</p>
-    <p class="line">게임 준비 중입니다<span class="blink">_</span></p>
-    <span class="badge">DEMO 준비 중 · <a href="https://github.com/Wansix/retro-developer">GitHub</a></span>
-  </main>
+
+  <!-- 타이틀 -->
+  <section id="screen-title" class="screen active">
+    <div class="terminal">
+      <h1>《옛날 개발자》</h1>
+      <p class="sub">퇴근하고 싶다 — 코딩은 입문 난이도, 직장생활은 하드코어</p>
+      <p class="line">2026년, 어느 개발자의 퇴근 2분 전.</p>
+      <button id="btn-start" class="btn">게임 시작</button>
+    </div>
+  </section>
+
+  <!-- 인트로: 승인 반복 -->
+  <section id="screen-intro" class="screen">
+    <div class="terminal">
+      <p class="line dim">AI 코딩 에이전트</p>
+      <p id="intro-text" class="line"></p>
+      <div id="intro-buttons"></div>
+    </div>
+  </section>
+
+  <!-- 사무실 -->
+  <section id="screen-office" class="screen">
+    <header id="statusbar">
+      <span id="st-day">입사 1일차</span>
+      <span id="st-hp">첼력 100</span>
+      <span id="st-ap">행동력 3</span>
+      <span id="st-progress">진행 0/6</span>
+      <span id="st-score">인사평가 0</span>
+    </header>
+
+    <div id="office-main">
+      <aside id="brief-panel">
+        <p class="speaker">김 과장</p>
+        <p id="boss-line"></p>
+        <hr>
+        <h2 id="mission-title"></h2>
+        <p id="mission-brief"></p>
+        <p id="mission-req"></p>
+      </aside>
+
+      <div id="work-panel">
+        <div class="editor-head">
+          <span>main.py</span>
+          <span id="paste-warning" class="warn hidden"></span>
+        </div>
+        <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+        <div class="actions">
+          <button id="btn-run" class="btn">실행</button>
+          <button id="btn-submit" class="btn primary">제출</button>
+        </div>
+        <div class="editor-head"><span>실행 결과</span></div>
+        <pre id="output">실행 버튼을 눌러 결과를 확인하세요.</pre>
+      </div>
+    </div>
+  </section>
+
+  <script src="src/missions.js"></script>
+  <script src="src/main.js"></script>
 </body>
 </html>
