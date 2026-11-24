@@ -56,7 +56,7 @@ export async function onRequestPost({ request, env }) {
         "Idempotency-Key": inputHash,
       },
       body: JSON.stringify({
-        model: env.HERMES_MODEL || "cojafa-judgment",
+        model: env.HERMES_MODEL || "gpt-6-luna",
         provider: "openai-codex",
         messages,
         stream: false,

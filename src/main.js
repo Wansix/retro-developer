@@ -263,7 +263,10 @@ function loadMission() {
   document.getElementById("mission-title").textContent = m.title;
   document.getElementById("mission-brief").textContent = m.brief;
   document.getElementById("mission-grammar").textContent = m.grammar;
-  document.getElementById("mission-example").textContent = "예시) " + m.example;
+  document.getElementById("mission-example").textContent = "예시 코드) " + m.example;
+  const exOut = document.getElementById("mission-example-out");
+  exOut.textContent = "예시 출력) " + m.exampleOut;
+  exOut.classList.toggle("hidden", !m.exampleOut);
   document.getElementById("mission-req").textContent = m.requirement;
   document.getElementById("mission-expected").textContent = m.expectedOut;
   document.getElementById("hint-box").classList.add("hidden");

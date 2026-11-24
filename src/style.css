@@ -2,8 +2,9 @@
 
 body {
   background: #1a2418;
-  color: #d8e0c8;
+  color: #e2e8d2;
   font-family: "Courier New", monospace;
+  font-size: 16px;
   min-height: 100vh;
 }
 
@@ -25,7 +26,7 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 .sub { color: #a8b890; margin-bottom: 1.5rem; }
 .line { color: #6fc040; line-height: 1.8; white-space: pre-wrap; }
 .line::before { content: "> "; color: #4a7a30; }
-.dim { color: #6a7a58; }
+.dim { color: #93a381; }
 .dim::before { content: ""; }
 
 .btn {
@@ -210,11 +211,11 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   border: 3px solid;
   border-color: #e8e0c8 #6a5f3a #6a5f3a #e8e0c8;
   padding: 0.4rem 0.8rem;
-  color: #3a3423;
-  font-size: 0.9rem;
+  color: #2e2a1c;
+  font-size: 1rem;
 }
 .hud-item { display: flex; align-items: center; gap: 0.4rem; }
-.hud-label { font-size: 0.72rem; color: #6a5f3a; }
+.hud-label { font-size: 0.8rem; color: #5a4f2a; }
 .hud-val { min-width: 2.2em; }
 .bar {
   width: 90px;
@@ -274,8 +275,8 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 }
 #boss-face { width: 56px; height: 56px; flex: none; }
 #boss-face svg, #boss-face img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
-#boss-text .speaker { font-weight: bold; font-size: 0.8rem; color: #5a4a1a; }
-#boss-text p { line-height: 1.5; margin-top: 0.2rem; }
+#boss-text .speaker { font-weight: bold; font-size: 0.9rem; color: #5a4a1a; }
+#boss-text p { line-height: 1.6; margin-top: 0.2rem; font-size: 1.02rem; }
 #boss-dialog.talk { animation: bosspop 0.25s ease; }
 @keyframes bosspop {
   0% { transform: scale(0.98); }
@@ -296,14 +297,14 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   border: 2px solid;
   border-color: #e8e0c8 #6a5f3a #6a5f3a #e8e0c8;
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   cursor: pointer;
   text-align: left;
 }
 .act-btn:hover { background: #c8bd94; }
 .act-btn:active { border-color: #6a5f3a #e8e0c8 #e8e0c8 #6a5f3a; }
 .act-btn:disabled { opacity: 0.45; cursor: default; }
-.act-btn .cost { font-size: 0.7rem; color: #6a5f3a; }
+.act-btn .cost { font-size: 0.78rem; color: #5a4f2a; }
 
 /* 미션 + 에디터 */
 #work-panel {
@@ -317,21 +318,23 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 }
 #mission-panel {
   background: #cfc5a2;
-  color: #3a3423;
+  color: #2e2a1c;
   border: 2px solid #8a7f5a;
-  padding: 0.8rem;
+  padding: 0.9rem;
+  font-size: 1rem;
 }
 #mission-panel h2 { color: #3a5a24; margin-top: 0; }
-#mission-panel p { line-height: 1.55; margin-bottom: 0.45rem; }
-.grammar { font-size: 0.88rem; color: #4a4232; background: #e8e0c8; padding: 0.4rem 0.5rem; border-left: 3px solid #8a7f5a; }
+#mission-panel p { line-height: 1.65; margin-bottom: 0.5rem; }
+.grammar { font-size: 0.95rem; color: #4a4232; background: #e8e0c8; padding: 0.4rem 0.5rem; border-left: 3px solid #8a7f5a; }
 .example {
   background: #060a05;
-  color: #9fd070;
+  color: #b8e888;
   padding: 0.5rem 0.6rem;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   margin-bottom: 0.45rem;
   white-space: pre-wrap;
 }
+.example.out { color: #e8d888; border-left: 3px solid #8a7f3a; }
 .req { font-weight: bold; }
 .expect code { background: #e8e0c8; padding: 0.1rem 0.4rem; }
 .hint {
@@ -352,14 +355,14 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 
 #editor {
   width: 100%;
-  min-height: 240px;
+  min-height: 260px;
   background: #060a05;
-  color: #b8e080;
+  color: #ccf29a;
   border: 1px solid #3a4a2e;
   padding: 0.8rem;
   font-family: "Courier New", monospace;
-  font-size: 1rem;
-  line-height: 1.5;
+  font-size: 1.08rem;
+  line-height: 1.6;
   resize: vertical;
   tab-size: 4;
 }
@@ -373,7 +376,9 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   border: 1px solid #3a4a2e;
   padding: 0.8rem;
   min-height: 90px;
-  color: #9fd070;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #b8e888;
   white-space: pre-wrap;
   word-break: break-all;
 }
