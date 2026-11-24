@@ -57,27 +57,128 @@
     </div>
   </section>
 
-  <!-- 사무실 -->
+  <!-- 메인 게임 -->
   <section id="screen-office" class="screen">
-    <header id="statusbar">
-      <span id="st-day">입사 1일차</span>
-      <span id="st-hp">첼력 100</span>
-      <span id="st-ap">행동력 3</span>
-      <span id="st-progress">진행 0/6</span>
-      <span id="st-score">인사평가 0</span>
+    <!-- 상단 HUD -->
+    <header id="hud">
+      <div class="hud-item"><span class="hud-label">날짜</span><span id="hud-date">입사 1일차 09:00</span></div>
+      <div class="hud-item"><span class="hud-label">마감</span><span id="hud-dday">D-10</span></div>
+      <div class="hud-item gauge"><span class="hud-label">첼력</span>
+        <div class="bar"><div id="bar-hp" class="bar-fill hp"></div></div><span id="hud-hp" class="hud-val">100</span>
+      </div>
+      <div class="hud-item gauge"><span class="hud-label">진행</span>
+        <div class="bar"><div id="bar-progress" class="bar-fill prog"></div></div><span id="hud-progress" class="hud-val">0/6</span>
+      </div>
+      <div class="hud-item"><span class="hud-label">코딩 Lv</span><span id="hud-level">1</span></div>
+      <div class="hud-item"><span class="hud-label">인사평가</span><span id="hud-score">0</span></div>
+      <div class="hud-item"><span class="hud-label">행동력</span><span id="hud-ap">■■■</span></div>
     </header>
 
     <div id="office-main">
-      <aside id="brief-panel">
-        <p class="speaker">김 과장</p>
-        <p id="boss-line"></p>
-        <hr>
-        <h2 id="mission-title"></h2>
-        <p id="mission-brief"></p>
-        <p id="mission-req"></p>
+      <!-- 왼쪽: 사무실 + 김 과장 + 행동 -->
+      <aside id="left-col">
+        <div id="office-scene">
+          <svg id="scene-svg" viewBox="0 0 320 120" shape-rendering="crispEdges" aria-label="미래소프트 사무실">
+            <!-- 벽과 바닥 -->
+            <rect x="0" y="0" width="320" height="80" fill="#9aa48a"/>
+            <rect x="0" y="80" width="320" height="40" fill="#6a7258"/>
+            <!-- 형광등 -->
+            <rect x="60" y="4" width="60" height="6" fill="#e8f0d8"/>
+            <rect x="200" y="4" width="60" height="6" fill="#e8f0d8"/>
+            <!-- 벽시계 -->
+            <rect x="150" y="14" width="16" height="16" fill="#e8e0c8"/>
+            <rect x="157" y="17" width="2" height="6" fill="#3a3423"/>
+            <rect x="157" y="21" width="5" height="2" fill="#3a3423"/>
+            <!-- 박 대리 책상 (왼쪽) -->
+            <rect x="8" y="70" width="60" height="6" fill="#8a7f5a"/>
+            <rect x="12" y="76" width="4" height="14" fill="#6a5f3a"/>
+            <rect x="60" y="76" width="4" height="14" fill="#6a5f3a"/>
+            <rect x="28" y="56" width="20" height="14" fill="#3a4a3a"/>
+            <rect x="31" y="59" width="14" height="8" fill="#6fc040"/>
+            <!-- 박 대리 -->
+            <g id="spr-park">
+              <rect x="46" y="46" width="10" height="10" fill="#e0b890"/>
+              <rect x="46" y="44" width="10" height="4" fill="#3a3423"/>
+              <rect x="45" y="56" width="12" height="14" fill="#7a6a4a"/>
+            </g>
+            <!-- 최 사원 책상 -->
+            <rect x="90" y="70" width="60" height="6" fill="#8a7f5a"/>
+            <rect x="94" y="76" width="4" height="14" fill="#6a5f3a"/>
+            <rect x="142" y="76" width="4" height="14" fill="#6a5f3a"/>
+            <rect x="110" y="56" width="20" height="14" fill="#3a4a3a"/>
+            <rect x="113" y="59" width="14" height="8" fill="#6fc040"/>
+            <!-- 최 사원 -->
+            <g id="spr-choi">
+              <rect x="128" y="46" width="10" height="10" fill="#e0b890"/>
+              <rect x="128" y="44" width="10" height="4" fill="#1a1a1a"/>
+              <rect x="127" y="56" width="12" height="14" fill="#4a5a7a"/>
+            </g>
+            <!-- 주인공 책상 -->
+            <rect x="180" y="70" width="70" height="6" fill="#8a7f5a"/>
+            <rect x="184" y="76" width="4" height="14" fill="#6a5f3a"/>
+            <rect x="242" y="76" width="4" height="14" fill="#6a5f3a"/>
+            <rect x="200" y="54" width="24" height="16" fill="#3a4a3a"/>
+            <rect x="203" y="57" width="18" height="10" fill="#8fd05a"/>
+            <!-- 커피잔 -->
+            <rect x="232" y="64" width="6" height="6" fill="#e8e0c8"/>
+            <!-- 주인공 -->
+            <g id="spr-me">
+              <rect x="226" y="44" width="10" height="10" fill="#e0b890"/>
+              <rect x="226" y="42" width="10" height="4" fill="#2a2a1a"/>
+              <rect x="225" y="54" width="12" height="16" fill="#5a6a3a"/>
+            </g>
+            <!-- 김 과장 (주인공 뒤) -->
+            <g id="spr-boss">
+              <rect x="262" y="38" width="12" height="12" fill="#d8a878"/>
+              <rect x="262" y="36" width="12" height="4" fill="#4a4a4a"/>
+              <rect x="261" y="50" width="14" height="20" fill="#3a3a3a"/>
+              <rect x="266" y="50" width="4" height="8" fill="#8a2a2a"/>
+            </g>
+          </svg>
+          <div id="scene-caption">미래소프트™ 개발 3팀</div>
+        </div>
+
+        <div id="boss-dialog">
+          <div id="boss-face">
+            <svg viewBox="0 0 24 24" shape-rendering="crispEdges">
+              <rect x="0" y="0" width="24" height="24" fill="#b8ab84"/>
+              <rect x="7" y="4" width="10" height="10" fill="#d8a878"/>
+              <rect x="7" y="3" width="10" height="3" fill="#4a4a4a"/>
+              <rect x="9" y="8" width="2" height="2" fill="#1a1a1a"/>
+              <rect x="13" y="8" width="2" height="2" fill="#1a1a1a"/>
+              <rect x="10" y="12" width="4" height="1" fill="#8a5a3a"/>
+              <rect x="6" y="14" width="12" height="8" fill="#3a3a3a"/>
+              <rect x="11" y="14" width="2" height="5" fill="#8a2a2a"/>
+            </svg>
+          </div>
+          <div id="boss-text">
+            <span class="speaker">김 과장</span>
+            <p id="boss-line">신입, 오늘부터 일 시작하지.</p>
+          </div>
+        </div>
+
+        <div id="actions">
+          <button class="act-btn" id="act-hint">동료 찬스 <span class="cost">행동력 1 · 힌트</span></button>
+          <button class="act-btn" id="act-coffee">커피 마시기 <span class="cost">행동력 1 · 첼력 +15</span></button>
+          <button class="act-btn" id="act-flatter">과장님께 아부 <span class="cost">행동력 1 · 평가 +45</span></button>
+          <button class="act-btn" id="act-delegate">업무 위임 <span class="cost">행동력 2 · 진행 +1</span></button>
+          <button class="act-btn" id="act-negotiate">일정 협상 <span class="cost">행동력 1</span></button>
+          <button class="act-btn" id="act-overtime">야근하기 <span class="cost">행동력 +2 · 첼력 −25</span></button>
+          <button class="act-btn" id="act-leave">퇴근하기 <span class="cost">다음 날 · 첼력 +20</span></button>
+        </div>
       </aside>
 
+      <!-- 오른쪽: 미션 + 에디터 -->
       <div id="work-panel">
+        <div id="mission-panel">
+          <h2 id="mission-title"></h2>
+          <p id="mission-brief"></p>
+          <p id="mission-grammar" class="grammar"></p>
+          <pre id="mission-example" class="example"></pre>
+          <p id="mission-req" class="req"></p>
+          <p class="expect">기대 결과: <code id="mission-expected"></code></p>
+          <p id="hint-box" class="hint hidden"></p>
+        </div>
         <div class="editor-head">
           <span>main.py</span>
           <span id="paste-warning" class="warn hidden"></span>
@@ -85,11 +186,47 @@
         <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
         <div class="actions">
           <button id="btn-run" class="btn">실행</button>
-          <button id="btn-submit" class="btn primary">제출</button>
+          <button id="btn-submit" class="btn primary">업무 제출</button>
         </div>
         <div class="editor-head"><span>실행 결과</span></div>
         <pre id="output">실행 버튼을 눌러 결과를 확인하세요.</pre>
       </div>
+    </div>
+  </section>
+
+  <!-- 레트로 시스템 알림창 -->
+  <div id="modal-event" class="modal hidden">
+    <div class="win">
+      <div class="win-title"><span id="event-title">알림</span><span class="win-x">×</span></div>
+      <div class="win-body"><p id="event-body"></p></div>
+      <div class="win-foot"><button id="event-ok" class="w95-btn">확인</button></div>
+    </div>
+  </div>
+
+  <!-- 일일 인사평가 비교 -->
+  <div id="modal-compare" class="modal hidden">
+    <div class="win wide">
+      <div class="win-title"><span>일일 인사평가 — 입사 <span id="cmp-day"></span>일차</span></div>
+      <div class="win-body">
+        <table id="cmp-table">
+          <thead><tr><th>평가 항목</th><th>나</th><th>최 사원</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p id="cmp-boss" class="cmp-boss"></p>
+      </div>
+      <div class="win-foot"><button id="cmp-ok" class="w95-btn">내일도 출근</button></div>
+    </div>
+  </div>
+
+  <!-- 엔딩 -->
+  <section id="screen-ending" class="screen">
+    <div class="terminal">
+      <p class="line dim" id="ending-sub">인사평가 결과</p>
+      <h1 id="ending-title"></h1>
+      <p class="sub" id="ending-desc"></p>
+      <table id="ending-table"><tbody></tbody></table>
+      <p id="ending-award" class="award"></p>
+      <button id="btn-restart" class="btn primary">다시 입사하기</button>
     </div>
   </section>
 
