@@ -37,7 +37,7 @@ const MISSIONS = [
     example: 'for i in range(1, 4):\n    print("*" * i)',
     exampleOut: "*\n**\n***",
     requirement: "★ 출력이 기대 결과와 같아지도록 빈칸을 채우세요.",
-    starter: 'for i in range(1, 6):\n    # 별을 i개 출력하세요\n    pass\n',
+    starter: 'for i in range(1, 6):\n    # 아래 pass를 지우고 별을 출력하는 코드를 쓰세요\n    # 힌트: "*" * i 를 print 하면 별이 i개 나옵니다\n    pass\n',
     expectedOut: "*\n**\n***\n****\n*****",
     hint: 'print("*" * i) 를 들여쓰기해서 넣으면 됩니다.',
     check: { type: "output", expected: "*\n**\n***\n****\n*****" },
@@ -99,6 +99,7 @@ const BOSS_LINES = {
   leave: "오늘 집에 무슨 일 있어?",
   morningAfter: "어제 무슨 일 있었어? 왜 그렇게 일찍 갔어?",
   negotiate: "일정이 왜 필요하지? 일이나 해.",
+  skip: "흠, 이건 내가 알아서 처리하지. 자네는 다음 거나 해.",
 };
 
 const PASTE_LINES = [

@@ -19,6 +19,7 @@ const initialState = () => ({
   hintCount: 0,
   delegateCount: 0,
   flatterCount: 0,
+  skipCount: 0,
   missionIndex: 0,
   bossLines: 0,
   tasksAssigned: 0,
@@ -360,23 +361,31 @@ async function handleSubmit() {
   resetIdle();
 }
 
-// 완료 처리: kind = 'direct' | 'delegate'
+// 완료 처리: kind = 'direct' | 'delegate' | 'skip'
 function completeMission(kind, stdout) {
-  state.ap -= kind === "delegate" ? 2 : 1;
+  if (kind === "direct") state.ap -= 1;
+  if (kind === "delegate") state.ap -= 2;
   state.progress += 1;
   if (kind === "direct") {
     state.hp = Math.max(0, state.hp - 5);
     state.score += 35;
     state.direct += 1;
     setOutput(stdout, "ok");
-  } else {
+  } else if (kind === "delegate") {
     state.score += 20;
     state.delegateCount += 1;
+  } else {
+    state.skipCount += 1;
+    setOutput("이 업무는 넘어갔습니다. (진행은 되지만 점수는 없습니다)", "");
   }
   tickClock();
   ["hud-progress", "hud-score", "hud-hp", "hud-ap"].forEach(flash);
   renderStatus();
-  bossSayDynamic("success", { missionId: MISSIONS[state.missionIndex].id, direct: kind === "direct" });
+  if (kind === "skip") {
+    bossSay(BOSS_LINES.skip);
+  } else {
+    bossSayDynamic("success", { missionId: MISSIONS[state.missionIndex].id, direct: kind === "direct" });
+  }
 
   if (checkEnding()) return;
 
@@ -393,7 +402,7 @@ function canAct(cost) {
 function updateActionButtons() {
   const map = {
     "act-hint": 1, "act-coffee": 1, "act-flatter": 1,
-    "act-delegate": 2, "act-negotiate": 1, "act-overtime": 0, "act-leave": 0,
+    "act-delegate": 2, "act-negotiate": 1, "act-skip": 0, "act-overtime": 0, "act-leave": 0,
   };
   for (const [id, cost] of Object.entries(map)) {
     const btn = document.getElementById(id);
@@ -456,6 +465,12 @@ function doNegotiate() {
   bossSay(BOSS_LINES.negotiate);
   showEvent("일정 협상", "김 과장은 일정 협상을 들어줄 기미가 없다.\n\"일정이 왜 필요하지? 일이나 해.\"");
   renderStatus();
+  resetIdle();
+}
+
+function doSkip() {
+  if (state.over) return;
+  completeMission("skip");
   resetIdle();
 }
 
@@ -669,6 +684,7 @@ function showEndingResult(key) {
     ["복붙 적발", `${state.pasteCount}회`],
     ["박 대리 찬스", `${state.hintCount}회`],
     ["위임 / 아부", `${state.delegateCount}회 / ${state.flatterCount}회`],
+    ["포기", `${state.skipCount}회`],
     ["최종 첼력", state.hp],
   ];
   document.querySelector("#ending-table tbody").innerHTML = rows
@@ -749,6 +765,7 @@ document.getElementById("act-coffee").onclick = doCoffee;
 document.getElementById("act-flatter").onclick = doFlatter;
 document.getElementById("act-delegate").onclick = doDelegate;
 document.getElementById("act-negotiate").onclick = doNegotiate;
+document.getElementById("act-skip").onclick = doSkip;
 document.getElementById("act-overtime").onclick = doOvertime;
 document.getElementById("act-leave").onclick = doLeave;
 
