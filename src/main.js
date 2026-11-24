@@ -199,9 +199,16 @@ function tickClock() {
 // --- 김 과장 ---
 let idleTimer = null;
 
-function bossSay(text) {
+function bossSay(text, aiGenerated = false) {
   state.bossLines += 1;
-  document.getElementById("boss-line").textContent = text;
+  const line = document.getElementById("boss-line");
+  line.textContent = text;
+  if (aiGenerated) {
+    const tag = document.createElement("span");
+    tag.className = "ai-tag";
+    tag.textContent = "AI";
+    line.appendChild(tag);
+  }
   const dlg = document.getElementById("boss-dialog");
   dlg.classList.remove("talk");
   void dlg.offsetWidth;
@@ -234,7 +241,7 @@ async function bossSayDynamic(kind, ctx = {}) {
     if (!res.ok) return;
     const data = await res.json();
     if (data && typeof data.line === "string" && data.line.trim()) {
-      bossSay(data.line.trim());
+      bossSay(data.line.trim(), true);
     }
   } catch {
     // 폴Fallback: 고정 대사 유지

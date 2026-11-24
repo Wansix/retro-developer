@@ -481,3 +481,16 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 #credits-list li:last-child { color: #e8c860; font-weight: bold; }
 .credits-final { color: #d8e0c8; line-height: 1.8; margin-bottom: 1.5rem; }
 .credits-end { color: #8fd05a; font-size: 1.6rem; letter-spacing: 0.4em; margin-bottom: 1rem; }
+
+/* AI 생성 대사 표시 (테스트용) */
+.ai-tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0 0.3rem;
+  font-size: 0.65rem;
+  vertical-align: super;
+  color: #e8c860;
+  border: 1px solid #e8c860;
+  border-radius: 3px;
+  opacity: 0.85;
+}
