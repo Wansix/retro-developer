@@ -129,10 +129,15 @@ function startTravel() {
   }, 750);
 }
 
+function markIntroSeen() {
+  try { localStorage.setItem("retro-intro-seen", "1"); } catch { /* 무시 */ }
+}
+
 function enter2006() {
   show("screen-2006");
   document.getElementById("chat-log-2006").innerHTML = "";
   runScript(SCENE_2006, "chat-log-2006", "buttons-2006", () => {
+    markIntroSeen();
     setTimeout(() => show("screen-titlecard"), 900);
   });
 }
@@ -728,6 +733,10 @@ document.getElementById("btn-start").onclick = () => {
 };
 
 document.getElementById("btn-gotowork").onclick = enterOffice;
+document.getElementById("btn-skip-intro").onclick = () => {
+  state = initialState();
+  enterOffice();
+};
 
 document.getElementById("btn-restart").onclick = () => {
   state = initialState();
@@ -738,6 +747,11 @@ document.getElementById("btn-restart").onclick = () => {
 };
 
 function renderTitleBest() {
+  try {
+    if (localStorage.getItem("retro-intro-seen")) {
+      document.getElementById("btn-skip-intro").classList.remove("hidden");
+    }
+  } catch { /* 무시 */ }
   const best = loadBest();
   document.getElementById("title-best").textContent = best
     ? `개인 최고 기록: ${best.score}점 — ${best.ending}`
