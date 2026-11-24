@@ -158,23 +158,60 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   white-space: pre-wrap;
   animation: pop 0.2s ease-out;
 }
+.bubble .who {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.7;
+  margin-bottom: 0.15rem;
+  letter-spacing: 0.05em;
+}
 @keyframes pop {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .bubble.ai {
   align-self: flex-start;
-  background: #22301c;
-  border: 1px solid #4a5d3a;
+  background: #0d140c;
+  border: 1px solid #3a5a24;
   color: #9fd070;
   border-bottom-left-radius: 2px;
 }
 .bubble.player {
   align-self: flex-end;
-  background: #3a5a24;
-  color: #e8f0d8;
+  background: #2a4a6a;
+  border: 1px solid #4a6a8a;
+  color: #e8f0f8;
   border-bottom-right-radius: 2px;
 }
+
+/* 2026: 에이전트 작업 로그 터미널 */
+#agent-term-wrap {
+  border: 1px solid #2a3a24;
+  border-radius: 6px;
+  background: #060a05;
+  margin: 0.8rem 0;
+}
+.term-title {
+  font-size: 0.75rem;
+  color: #4a7a30;
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid #2a3a24;
+  letter-spacing: 0.08em;
+}
+#agent-term {
+  height: 6.5rem;
+  overflow-y: auto;
+  padding: 0.5rem 0.6rem;
+  color: #6fc040;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  text-shadow: 0 0 6px rgba(120, 220, 80, 0.4);
+}
+#agent-term::after {
+  content: "▊";
+  animation: blink 0.8s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
 
 #intro-buttons, #buttons-2006 {
   display: flex;

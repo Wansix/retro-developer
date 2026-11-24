@@ -20,16 +20,43 @@ function show(id) {
 
 // --- 프롤로그: 스크립트 러너 ---
 // steps의 'me' 대사는 플레이어가 직접 누르고, 'ai'/'boss' 대사는 자동으로 진행된다.
+const WHO_LABEL = { me: "나", ai: "AI 에이전트", boss: "김 과장" };
+
 function addChatTo(logId, text, who) {
   const log = document.getElementById(logId);
   const div = document.createElement("div");
   div.className = `bubble ${who === "me" ? "player" : who}`;
-  div.textContent = text;
+  const label = document.createElement("span");
+  label.className = "who";
+  label.textContent = WHO_LABEL[who] || who;
+  div.appendChild(label);
+  div.appendChild(document.createTextNode(text));
   log.appendChild(div);
   div.scrollIntoView({ behavior: "smooth", block: "end" });
 }
 
-function runScript(steps, logId, btnsId, onDone, onAnger) {
+// 에이전트 작업 로그를 띠리리리 타이핑되는 것처럼 출력
+function typeAgentLogs(lines, termId, done) {
+  const term = document.getElementById(termId);
+  let li = 0, ci = 0;
+  term.textContent += "\n";
+  function tick() {
+    if (li >= lines.length) { done(); return; }
+    const line = lines[li];
+    if (ci < line.length) {
+      term.textContent += line[ci++];
+      setTimeout(tick, 14);
+    } else {
+      term.textContent += "\n";
+      li++; ci = 0;
+      setTimeout(tick, 180);
+    }
+    term.scrollTop = term.scrollHeight;
+  }
+  tick();
+}
+
+function runScript(steps, logId, btnsId, onDone, opts = {}) {
   let i = 0;
   let meCount = 0;
   const box = document.getElementById(btnsId);
@@ -46,10 +73,15 @@ function runScript(steps, logId, btnsId, onDone, onAnger) {
         box.innerHTML = "";
         addChatTo(logId, step.text, "me");
         meCount++;
-        if (onAnger) onAnger(meCount);
+        if (opts.onAnger) opts.onAnger(meCount);
         setTimeout(next, 500);
       };
       box.appendChild(b);
+    } else if (step.logs && opts.termId) {
+      typeAgentLogs(step.logs, opts.termId, () => {
+        addChatTo(logId, step.text, step.who);
+        setTimeout(next, 400);
+      });
     } else {
       setTimeout(() => {
         addChatTo(logId, step.text, step.who);
@@ -240,8 +272,12 @@ function onPasteAttempt(e) {
 document.getElementById("btn-start").onclick = () => {
   show("screen-intro");
   document.getElementById("chat-log").innerHTML = "";
+  document.getElementById("agent-term").textContent = "";
   document.getElementById("screen-intro").classList.remove("anger-1", "anger-2", "anger-3");
-  runScript(PROLOGUE_2026, "chat-log", "intro-buttons", startTravel, escalateAnger);
+  runScript(PROLOGUE_2026, "chat-log", "intro-buttons", startTravel, {
+    onAnger: escalateAnger,
+    termId: "agent-term",
+  });
 };
 
 document.getElementById("btn-gotowork").onclick = enterOffice;
