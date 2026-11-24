@@ -18,29 +18,58 @@ function show(id) {
   document.getElementById(id).classList.add("active");
 }
 
-// --- 인트로 ---
-let introStep = 0;
-function playIntro() {
-  const step = INTRO_STEPS[introStep];
-  const text = document.getElementById("intro-text");
-  const buttons = document.getElementById("intro-buttons");
-  if (!step) {
-    text.textContent = "알겠습니다. 대신 볼 일이 생겼습니다.\n2006년 3월, 미래소프트™로 볼내드리겠습니다.";
-    buttons.innerHTML = "";
+// --- 인트로: AI와 설전 ---
+let introRound = 0;
+
+function addChat(text, who) {
+  const log = document.getElementById("chat-log");
+  const div = document.createElement("div");
+  div.className = `bubble ${who}`;
+  div.textContent = text;
+  log.appendChild(div);
+  div.scrollIntoView({ behavior: "smooth", block: "end" });
+}
+
+function setIntroButtons(labels, onPick) {
+  const box = document.getElementById("intro-buttons");
+  box.innerHTML = "";
+  labels.forEach((label, i) => {
     const b = document.createElement("button");
-    b.className = "btn primary";
-    b.textContent = "...뭐야?!";
-    b.onclick = enterOffice;
-    buttons.appendChild(b);
+    b.className = "btn";
+    b.textContent = label;
+    b.onclick = () => onPick(i);
+    box.appendChild(b);
+  });
+}
+
+function playIntro() {
+  const round = INTRO_ROUNDS[introRound];
+  const buttons = document.getElementById("intro-buttons");
+  if (!round) return;
+
+  addChat(round.ai, "ai");
+
+  if (round.final) {
+    setIntroButtons([round.final], () => {
+      buttons.innerHTML = "";
+      addChat(round.final, "player");
+      setTimeout(() => {
+        addChat(round.after, "ai");
+        setIntroButtons(["...뭐야?!"], enterOffice);
+      }, 700);
+    });
     return;
   }
-  text.textContent = step.text;
-  buttons.innerHTML = "";
-  const b = document.createElement("button");
-  b.className = "btn";
-  b.textContent = step.button;
-  b.onclick = () => { introStep++; playIntro(); };
-  buttons.appendChild(b);
+
+  setIntroButtons(round.choices.map((c) => c.player), (i) => {
+    buttons.innerHTML = "";
+    addChat(round.choices[i].player, "player");
+    setTimeout(() => {
+      addChat(round.choices[i].ai, "ai");
+      introRound++;
+      setTimeout(playIntro, 500);
+    }, 600);
+  });
 }
 
 // --- Python 워커 ---
@@ -191,7 +220,8 @@ function onPasteAttempt(e) {
 // --- 시작 ---
 document.getElementById("btn-start").onclick = () => {
   show("screen-intro");
-  introStep = 0;
+  introRound = 0;
+  document.getElementById("chat-log").innerHTML = "";
   playIntro();
 };
 

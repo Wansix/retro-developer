@@ -136,3 +136,49 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 #output.ok { color: #8fd05a; }
 
 .hidden { display: none; }
+
+/* 인트로 채팅 */
+.terminal.chat { max-width: 640px; }
+
+#chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 50vh;
+  overflow-y: auto;
+  margin: 1rem 0;
+  padding-right: 0.4rem;
+}
+
+.bubble {
+  max-width: 80%;
+  padding: 0.55rem 0.9rem;
+  border-radius: 10px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  animation: pop 0.2s ease-out;
+}
+@keyframes pop {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.bubble.ai {
+  align-self: flex-start;
+  background: #22301c;
+  border: 1px solid #4a5d3a;
+  color: #9fd070;
+  border-bottom-left-radius: 2px;
+}
+.bubble.player {
+  align-self: flex-end;
+  background: #3a5a24;
+  color: #e8f0d8;
+  border-bottom-right-radius: 2px;
+}
+
+#intro-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+#intro-buttons .btn { margin-top: 0; text-align: left; }
