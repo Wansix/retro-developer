@@ -44,11 +44,16 @@ export async function onRequestPost({ request, env }) {
   ];
 
   try {
+    // 헤륩스 브리지는 Idempotency-Key(요청 해시)를 요구한다 (cojafa 방식)
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(messages)));
+    const inputHash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+
     const res = await fetch(`${env.HERMES_URL}/v1/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${env.HERMES_KEY}`,
+        "Idempotency-Key": inputHash,
       },
       body: JSON.stringify({
         model: env.HERMES_MODEL || "cojafa-judgment",
