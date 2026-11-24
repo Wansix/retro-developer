@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>옛날 개발자 — 퇴근하고 싶다</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a2418;
+    color: #d8e0c8;
+    font-family: "Courier New", monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  .terminal {
+    background: #0d140c;
+    border: 2px solid #4a5d3a;
+    border-radius: 8px;
+    max-width: 720px;
+    width: 100%;
+    padding: 2rem;
+    box-shadow: 0 0 40px rgba(120, 200, 80, 0.15);
+  }
+  h1 { color: #8fd05a; font-size: 2rem; margin-bottom: 0.5rem; }
+  .sub { color: #a8b890; margin-bottom: 1.5rem; }
+  .line { color: #6fc040; line-height: 1.8; }
+  .line::before { content: "> "; color: #4a7a30; }
+  .blink { animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .badge {
+    display: inline-block;
+    margin-top: 1.5rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #4a5d3a;
+    color: #a8b890;
+    font-size: 0.85rem;
+  }
+  a { color: #8fd05a; }
+</style>
+</head>
+<body>
+  <main class="terminal">
+    <h1>《옛날 개발자》</h1>
+    <p class="sub">퇴근하고 싶다 — 코딩은 입문 난이도, 직장생활은 하드코어</p>
+    <p class="line">2006년 3월, 미래소프트™에 오신 것을 환영합니다.</p>
+    <p class="line">AI 코딩 지원 없이 납기 안에 프로젝트를 완성하세요.</p>
+    <p class="line">골든 키보드상이 당신을 기다립니다.</p>
+    <p class="line">게임 준비 중입니다<span class="blink">_</span></p>
+    <span class="badge">DEMO 준비 중 · <a href="https://github.com/Wansix/retro-developer">GitHub</a></span>
+  </main>
+</body>
+</html>
