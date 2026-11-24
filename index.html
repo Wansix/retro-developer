@@ -15,6 +15,7 @@
       <p class="sub">퇴근하고 싶다 — 코딩은 입문 난이도, 직장생활은 하드코어</p>
       <p class="line">2026년, 어느 개발자의 퇴근 2분 전.</p>
       <button id="btn-start" class="btn">게임 시작</button>
+      <p id="title-best" class="best"></p>
     </div>
   </section>
 
@@ -218,6 +219,28 @@
     </div>
   </div>
 
+  <!-- 반전 엔딩 -->
+  <section id="screen-twist" class="screen">
+    <div class="terminal chat retro" id="twist-terminal">
+      <p class="line dim">2026년으로 돌아가기 직전 — 미래소프트™</p>
+      <div id="chat-log-twist"></div>
+      <pre id="twist-syslog" class="hidden"></pre>
+      <p id="twist-achievement" class="achievement hidden"></p>
+      <div id="buttons-twist"></div>
+    </div>
+  </section>
+
+  <!-- 엔딩 크레딧 -->
+  <section id="screen-credits" class="screen">
+    <div class="credits">
+      <h2 class="credits-head">엔딩 크레딧</h2>
+      <ul id="credits-list"></ul>
+      <p class="credits-final">"이 게임에서 유일하게 직접 일한 존재는 당신이었습니다."</p>
+      <p class="credits-end">THE END</p>
+      <button id="btn-credits-ok" class="btn primary">결과 보기</button>
+    </div>
+  </section>
+
   <!-- 엔딩 -->
   <section id="screen-ending" class="screen">
     <div class="terminal">
@@ -226,6 +249,7 @@
       <p class="sub" id="ending-desc"></p>
       <table id="ending-table"><tbody></tbody></table>
       <p id="ending-award" class="award"></p>
+      <p id="ending-best" class="best"></p>
       <button id="btn-restart" class="btn primary">다시 입사하기</button>
     </div>
   </section>

@@ -442,3 +442,37 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 #ending-table { margin: 1rem 0; color: #d8e0c8; }
 #ending-table td { border-color: #3a4a2e; }
 .award { color: #e8c860; font-weight: bold; min-height: 1.4em; }
+.best { color: #6a7a58; font-size: 0.85rem; margin-top: 0.5rem; }
+
+/* 반전 엔딩 */
+#twist-terminal.glitching { animation: glitch 0.2s steps(2) infinite; }
+#twist-syslog {
+  background: #000;
+  border: 1px solid #3a5a24;
+  color: #6fc040;
+  padding: 0.8rem;
+  margin: 0.8rem 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  text-shadow: 0 0 6px rgba(120, 220, 80, 0.5);
+}
+.achievement {
+  background: #2a2410;
+  border: 1px solid #e8c860;
+  color: #e8c860;
+  padding: 0.6rem 0.8rem;
+  margin: 0.8rem 0;
+  text-align: center;
+  animation: pop 0.3s ease-out;
+}
+
+/* 크레딧 */
+#screen-credits { background: #000; }
+.credits { text-align: center; max-width: 480px; }
+.credits-head { color: #6a7a58; font-size: 1rem; letter-spacing: 0.3em; margin-bottom: 1.5rem; }
+#credits-list { list-style: none; margin-bottom: 2rem; }
+#credits-list li { color: #9fd070; line-height: 2.2; animation: pop 0.4s ease-out both; }
+#credits-list li:last-child { color: #e8c860; font-weight: bold; }
+.credits-final { color: #d8e0c8; line-height: 1.8; margin-bottom: 1.5rem; }
+.credits-end { color: #8fd05a; font-size: 1.6rem; letter-spacing: 0.4em; margin-bottom: 1rem; }

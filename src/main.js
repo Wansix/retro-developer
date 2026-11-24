@@ -20,6 +20,10 @@ const initialState = () => ({
   delegateCount: 0,
   flatterCount: 0,
   missionIndex: 0,
+  bossLines: 0,
+  tasksAssigned: 0,
+  parkGone: false,
+  bossAway: false,
   over: false,
 });
 let state = initialState();
@@ -196,6 +200,7 @@ function tickClock() {
 let idleTimer = null;
 
 function bossSay(text) {
+  state.bossLines += 1;
   document.getElementById("boss-line").textContent = text;
   const dlg = document.getElementById("boss-dialog");
   dlg.classList.remove("talk");
@@ -203,9 +208,42 @@ function bossSay(text) {
   dlg.classList.add("talk");
 }
 
+// AI 김 과장 대사 (Phase 3.6): 즉시 고정 대사를 보여주고, 서버가 동적 대사를 주면 교체.
+// 실패·시간 초과·키 미설정(503) 시 고정 대사가 그대로 유지된다. 게임 로직에는 관여하지 않는다.
+async function bossSayDynamic(kind, ctx = {}) {
+  bossSay(BOSS_LINES[kind]);
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 2500);
+    const res = await fetch("/api/boss-line", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind,
+        ...ctx,
+        day: state.day,
+        hp: state.hp,
+        ap: state.ap,
+        progress: state.progress,
+        overtime: state.overtime,
+        hintCount: state.hintCount,
+      }),
+      signal: ctl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && typeof data.line === "string" && data.line.trim()) {
+      bossSay(data.line.trim());
+    }
+  } catch {
+    // 폴Fallback: 고정 대사 유지
+  }
+}
+
 function resetIdle() {
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => bossSay(BOSS_LINES.idle), IDLE_MS);
+  idleTimer = setTimeout(() => bossSayDynamic("idle"), IDLE_MS);
 }
 
 // --- 레트로 알림창 ---
@@ -271,10 +309,10 @@ async function handleRun() {
   setBusy(false);
   if (res.timeout) {
     setOutput("시간 초과: 실행이 너무 오래 걸려 중단했습니다. 무한 루프를 확인하세요.", "error");
-    bossSay(BOSS_LINES.error);
+    bossSayDynamic("error", { situation: "infinite_loop" });
   } else if (!res.ok) {
     setOutput(res.stdout + "\n" + lastErrorLine(res.error), "error");
-    bossSay(BOSS_LINES.error);
+    bossSayDynamic("error", { error: lastErrorLine(res.error) });
   } else {
     setOutput(res.stdout || "(출력 없음)", "");
   }
@@ -295,12 +333,12 @@ async function handleSubmit() {
 
   if (res.timeout) {
     setOutput("시간 초과: 실행이 너무 오래 걸려 중단했습니다. 무한 루프를 확인하세요.", "error");
-    bossSay(BOSS_LINES.error);
+    bossSayDynamic("error", { situation: "infinite_loop" });
     return;
   }
   if (!res.ok) {
     setOutput(res.stdout + "\n" + lastErrorLine(res.error), "error");
-    bossSay(BOSS_LINES.error);
+    bossSayDynamic("error", { error: lastErrorLine(res.error) });
     return;
   }
   if (!grade(m, res.stdout)) {
@@ -328,11 +366,12 @@ function completeMission(kind, stdout) {
   tickClock();
   ["hud-progress", "hud-score", "hud-hp", "hud-ap"].forEach(flash);
   renderStatus();
-  bossSay(BOSS_LINES.success);
+  bossSayDynamic("success", { missionId: MISSIONS[state.missionIndex].id, direct: kind === "direct" });
 
   if (checkEnding()) return;
 
   state.missionIndex += 1;
+  state.tasksAssigned += 1;
   setTimeout(loadMission, 800);
 }
 
@@ -351,6 +390,7 @@ function updateActionButtons() {
     let disabled = !canAct(cost);
     if (id === "act-overtime" && state.hp <= 25) disabled = true;
     if (id === "act-hint" && document.getElementById("hint-box").classList.contains("hidden") === false) disabled = true;
+    if (id === "act-hint" && state.parkGone) disabled = true;
     btn.disabled = disabled;
   }
 }
@@ -375,7 +415,7 @@ function doCoffee() {
   state.hp = Math.min(100, state.hp + 15);
   tickClock();
   flash("hud-hp");
-  bossSay(BOSS_LINES.coffee);
+  bossSayDynamic("coffee");
   renderStatus();
   resetIdle();
 }
@@ -424,7 +464,7 @@ function doOvertime() {
 
 function doLeave() {
   if (state.over) return;
-  bossSay(BOSS_LINES.leave);
+  bossSayDynamic("leave");
   state.choiScore += 65;
   showCompare();
 }
@@ -464,7 +504,36 @@ function nextDay() {
   if (checkEnding()) return;
   renderStatus();
   bossSay(BOSS_LINES.morningAfter);
+  rollDailyEvent();
   resetIdle();
+}
+
+// 랜덤 사무실 이벤트 (기획서 §4 축소판)
+function rollDailyEvent() {
+  if (Math.random() > 0.5) return;
+  const pool = [];
+  if (!state.parkGone) pool.push("park-quit");
+  pool.push(state.bossAway ? "meeting-cancel" : "boss-meeting");
+  const ev = pool[Math.floor(Math.random() * pool.length)];
+
+  if (ev === "park-quit") {
+    state.parkGone = true;
+    document.getElementById("spr-park").style.display = "none";
+    showEvent("인사팀 공지",
+      "박 대리가 퇴사했습니다.\n박 대리 찬스가 비활성화되었습니다.\n박 대리의 업무가 당신에게 이전되었습니다.");
+  } else if (ev === "boss-meeting") {
+    state.bossAway = true;
+    document.getElementById("spr-boss").classList.add("away");
+    state.ap += 1;
+    showEvent("사내 공지",
+      "김 과장의 회의가 잡혔습니다.\n상사 부재 버프를 획득했습니다. (행동력 +1)");
+  } else {
+    state.bossAway = false;
+    document.getElementById("spr-boss").classList.remove("away");
+    showEvent("사내 공지",
+      "김 과장의 회의가 취소되었습니다.\n김 과장이 자리로 돌아왔습니다.");
+  }
+  renderStatus();
 }
 
 // --- 엔딩 (기획서 §5 우선순위) ---
@@ -488,8 +557,94 @@ const ENDINGS = {
   normal: { title: "평범한 개발자", desc: "프로젝트는 끝냈지만 최 사원의 평가를 넘지 못했다. 월급은 똑같다.", award: false },
 };
 
+// 귀환 성공 엔딩은 반전 시퀀스를 먼저 재생한다 (Phase 3.5)
+const TWIST_ENDINGS = ["manager", "golden", "normal"];
+
 function endGame(key) {
   state.over = true;
+  saveBest(key);
+  if (TWIST_ENDINGS.includes(key)) {
+    playTwist(() => showEndingResult(key));
+  } else {
+    showEndingResult(key);
+  }
+  return true;
+}
+
+function typeLines(el, lines, done) {
+  let i = 0;
+  const iv = setInterval(() => {
+    if (i >= lines.length) { clearInterval(iv); done(); return; }
+    el.textContent += lines[i++] + "\n";
+  }, 200);
+}
+
+function playTwist(done) {
+  show("screen-twist");
+  document.getElementById("chat-log-twist").innerHTML = "";
+  document.getElementById("twist-syslog").classList.add("hidden");
+  document.getElementById("twist-syslog").textContent = "";
+  document.getElementById("twist-achievement").classList.add("hidden");
+  runScript(TWIST_BEFORE, "chat-log-twist", "buttons-twist", () => {
+    const term = document.getElementById("twist-terminal");
+    term.classList.add("glitching");
+    setTimeout(() => {
+      term.classList.remove("glitching");
+      const log = document.getElementById("twist-syslog");
+      log.classList.remove("hidden");
+      const stats = { bossLines: state.bossLines, tasks: state.tasksAssigned };
+      typeLines(log, twistSystemLog(stats), () => {
+        runScript(TWIST_AFTER, "chat-log-twist", "buttons-twist", () => {
+          const ach = document.getElementById("twist-achievement");
+          ach.textContent = TWIST_ACHIEVEMENT;
+          ach.classList.remove("hidden");
+          const box = document.getElementById("buttons-twist");
+          box.innerHTML = "";
+          const b = document.createElement("button");
+          b.className = "btn primary";
+          b.textContent = "엔딩 크레딧";
+          b.onclick = () => showCredits(done);
+          box.appendChild(b);
+        });
+      });
+    }, 1200);
+  });
+}
+
+function showCredits(done) {
+  const ul = document.getElementById("credits-list");
+  ul.innerHTML = "";
+  CREDITS.forEach((c, i) => {
+    const li = document.createElement("li");
+    li.textContent = c;
+    li.style.animationDelay = `${i * 0.45}s`;
+    ul.appendChild(li);
+  });
+  show("screen-credits");
+  document.getElementById("btn-credits-ok").onclick = done;
+}
+
+function saveBest(key) {
+  try {
+    const prev = JSON.parse(localStorage.getItem("retro-best") || "null");
+    const rec = {
+      score: state.score,
+      ending: ENDINGS[key].title,
+      cleared: state.progress >= MISSIONS.length,
+      day: state.day,
+    };
+    if (!prev || rec.score > prev.score) {
+      localStorage.setItem("retro-best", JSON.stringify(rec));
+    }
+  } catch { /* 저장 불가 환경 무시 */ }
+}
+
+function loadBest() {
+  try { return JSON.parse(localStorage.getItem("retro-best") || "null"); }
+  catch { return null; }
+}
+
+function showEndingResult(key) {
   const e = ENDINGS[key];
   document.getElementById("ending-title").textContent = e.title;
   document.getElementById("ending-desc").textContent = e.desc;
@@ -509,6 +664,10 @@ function endGame(key) {
   document.querySelector("#ending-table tbody").innerHTML = rows
     .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
     .join("");
+  const best = loadBest();
+  document.getElementById("ending-best").textContent = best
+    ? `개인 최고 기록: ${best.score}점 — ${best.ending}${best.cleared ? ` (${best.day}일차 클리어)` : ""}`
+    : "";
   show("screen-ending");
   return true;
 }
@@ -547,8 +706,18 @@ document.getElementById("btn-gotowork").onclick = enterOffice;
 document.getElementById("btn-restart").onclick = () => {
   state = initialState();
   document.getElementById("paste-warning").classList.add("hidden");
+  document.getElementById("spr-park").style.display = "";
+  document.getElementById("spr-boss").classList.remove("away");
   enterOffice();
 };
+
+function renderTitleBest() {
+  const best = loadBest();
+  document.getElementById("title-best").textContent = best
+    ? `개인 최고 기록: ${best.score}점 — ${best.ending}`
+    : "";
+}
+renderTitleBest();
 
 const editor = document.getElementById("editor");
 editor.addEventListener("paste", onPasteAttempt);

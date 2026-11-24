@@ -148,3 +148,45 @@ const SCENE_2006 = [
   { who: "ai", text: "행운을 빕니다. 인간 개발자님." },
   { who: "me", text: "아니 잠깐만!!!" },
 ];
+
+// 반전 엔딩 (기획서 Phase 3.5) — 고정 대사. stats는 실제 플레이 기록.
+const TWIST_BEFORE = [
+  { who: "boss", text: "신입, 그동안 고생 많았다." },
+  { who: "me", text: "과장님도 건강하세요. 제발 후배들한테 좀 잘해주시고요." },
+  { who: "boss", text: "그래. 자네 같은 개발자는 처음이었어." },
+];
+
+function twistSystemLog(stats) {
+  return [
+    "[SIMULATION COMPLETE]",
+    "",
+    "Agent: KIM_MANAGER",
+    "Role: 2006년 중소기업 개발팀 과장",
+    "Personality: 권위적, 모호한 업무 지시",
+    "Objective: 신입 개발자의 업무 처리량 극대화",
+    "",
+    `Generated dialogues: ${stats.bossLines}`,
+    `Additional tasks assigned: ${stats.tasks}`,
+    "",
+    "Shutting down agent...",
+  ];
+}
+
+const TWIST_AFTER = [
+  { who: "me", text: "……잠깐. 김 과장도 AI였어?" },
+  { who: "ai", text: "네. 당시의 직장 문화를 재현하기 위해 설계된 AI 에이전트입니다." },
+  { who: "me", text: "그럼 내가 열흘 동안 AI한테 갈굼당하면서 코딩한 거야?" },
+  { who: "ai", text: "정확합니다." },
+  { who: "me", text: "야 이 개XX야!!!" },
+];
+
+const TWIST_ACHIEVEMENT = "[업적 달성: AI에게서 도망쳐 AI의 부하가 되었습니다.]";
+
+const CREDITS = [
+  "김 과장 역: AI",
+  "박 대리 역: AI",
+  "최 사원 역: AI",
+  "고객사 담당자 역: AI",
+  "업무 배정 및 일정 관리: AI",
+  "실제 코딩 및 야근 담당: 플레이어",
+];
