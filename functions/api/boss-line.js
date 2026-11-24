@@ -1,6 +1,10 @@
-// 김 과장 동적 대사 (Phase 3.6)
-// API 키는 Cloudflare Pages 환경 변수(ANTHROPIC_API_KEY)로만 관리한다.
-// 키가 없거나 오류가 나면 503을 반환하고, 클라이언트는 고정 대사를 유지한다.
+// 김 과장 동적 대사 (Phase 3.6) — cojafa와 같은 Hermes 서버 경유.
+// Hermes는 OpenAI 호환 /v1/chat/completions를 제공한다.
+// 설정(Cloudflare Pages 환경 변수, 서버 측에서만 관리):
+//   HERMES_URL  — 예: https://hermes.example.com (cojafa는 로컬 터널 127.0.0.1:18643 사용)
+//   HERMES_KEY  — Bearer 키
+//   HERMES_MODEL — 선택, 기본 cojafa-judgment
+// 미설정·오류·시간 초과 시 503을 반환하고 클라이언트는 고정 대사를 유지한다.
 // 이 함수는 대사 텍스트만 생성한다. 점수·판정 등 게임 로직에는 관여하지 않는다.
 
 const PERSONA = `당신은 2006년 한국 중소 IT 회사의 개발팀 과장 "김 과장"입니다.
@@ -17,7 +21,7 @@ const SITUATIONS = {
 };
 
 export async function onRequestPost({ request, env }) {
-  if (!env.ANTHROPIC_API_KEY) {
+  if (!env.HERMES_URL || !env.HERMES_KEY) {
     return new Response("LLM disabled", { status: 503 });
   }
   let body;
@@ -34,24 +38,30 @@ export async function onRequestPost({ request, env }) {
     `입사 ${body.day}일차, 첼력 ${body.hp}, 야근 ${body.overtime}회, 힌트 사용 ${body.hintCount}회.`,
   ].filter(Boolean).join(" ");
 
+  const messages = [
+    { role: "system", content: PERSONA },
+    { role: "user", content: `상황: ${situation}\n${detail}` },
+  ];
+
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch(`${env.HERMES_URL}/v1/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${env.HERMES_KEY}`,
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 80,
-        system: PERSONA,
-        messages: [{ role: "user", content: `상황: ${situation}\n${detail}` }],
+        model: env.HERMES_MODEL || "cojafa-judgment",
+        provider: "openai-codex",
+        messages,
+        stream: false,
+        model_options: { reasoning: { effort: "low" } },
       }),
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return new Response("llm error", { status: 503 });
     const data = await res.json();
-    const line = data?.content?.[0]?.text?.trim() || "";
+    const line = data?.choices?.[0]?.message?.content?.trim() || "";
     if (!line) return new Response("empty", { status: 503 });
     return Response.json({ line: line.slice(0, 120) });
   } catch {

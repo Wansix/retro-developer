@@ -214,7 +214,7 @@ async function bossSayDynamic(kind, ctx = {}) {
   bossSay(BOSS_LINES[kind]);
   try {
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 2500);
+    const timer = setTimeout(() => ctl.abort(), 6000);
     const res = await fetch("/api/boss-line", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
