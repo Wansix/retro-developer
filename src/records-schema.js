@@ -1,9 +1,19 @@
 export const TOTAL_DAYS = 30;
-export const RULESET = 1;
+export const FIRST_RULESET = 1;
+export const RULESET = 2;
+
+export const SCRUM_METRICS = [
+  ["scrums", "스크럼 참석", "회"],
+  ["scrumMinutes", "스크럼·후속 회의", "분"],
+  ["promisesKept", "보고 약속 이행", "회"],
+  ["promisesMissed", "보고 약속 미이행", "회"],
+  ["reportTrust", "보고 신뢰도", "/100"],
+];
 
 export const METRICS = [
   ["coding", "실제 코딩 시간", "분"],
   ["meetings", "전체 회의 시간", "분"],
+  ...SCRUM_METRICS,
   ["overtime", "야근 횟수", "회"],
   ["onTime", "정시 퇴근 횟수", "회"],
   ["planning", "기획자와 싸운 시간", "분"],

@@ -363,7 +363,7 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   padding: 0.4rem 0.5rem;
   font-size: 0.9rem;
 }
-.hint::before { content: "박 선임: "; font-weight: bold; }
+.hint::before { content: "박 대리: "; font-weight: bold; }
 
 .editor-head {
   display: flex;
@@ -399,6 +399,35 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   line-height: 1.6;
 }
 .submit-help .btn { margin-top: .45rem; }
+#scrum-panel {
+  padding: .8rem;
+  background: #182318;
+  border: 1px solid #56694e;
+  color: #e2e8d2;
+  line-height: 1.6;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+#scrum-panel h2 { margin: 0 0 .35rem; font-size: 1rem; color: #b9cfaa; }
+#scrum-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+  gap: .35rem;
+  margin: .55rem 0;
+}
+#scrum-totals:empty { display: none; }
+#scrum-totals div { background: #253322; padding: .28rem .5rem; }
+#scrum-totals dt { color: #b9cfaa; font-size: .78rem; }
+#scrum-previous { color: #b9cfaa; font-size: .88rem; }
+#scrum-previous:empty { display: none; }
+#scrum-today { margin-top: .5rem; }
+#scrum-history { margin-top: .5rem; }
+#scrum-history summary { cursor: pointer; color: #cddd9c; }
+#scrum-promises { padding-inline-start: 1.2rem; margin-top: .35rem; }
+.record-awards { margin-top: .55rem; color: #cddd9c; }
+@media (max-width: 480px) {
+  #scrum-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 #output {
   background: #060a05;

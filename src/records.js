@@ -85,6 +85,7 @@ function recordDetails(record) {
   title.textContent = `${ENDINGS[record.ending].title} · ${record.day}일차`;
   const stats = document.createElement("dl");
   for (const [key, name, unit] of METRICS) {
+    if (!(key in record)) continue;
     const term = document.createElement("dt");
     const value = document.createElement("dd");
     term.textContent = name;
@@ -92,6 +93,12 @@ function recordDetails(record) {
     stats.append(term, value);
   }
   detail.append(title, stats);
+  if (record.achievements?.length) {
+    const awards = document.createElement("p");
+    awards.className = "record-awards";
+    awards.textContent = `업적 · ${record.achievements.join(" · ")}`;
+    detail.append(awards);
+  }
   return detail;
 }
 

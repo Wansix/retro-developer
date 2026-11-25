@@ -1,9 +1,11 @@
 import { ARCHITECTURE, AUTOMATION, CODE_REVIEW, DEPARTMENTS, ENDINGS, EXTRA_TICKETS, LUNCH, OFFICE_EVENTS, TICKETS } from "./office-content.js";
 import { MISSIONS } from "./missions.js";
-import { TOTAL_DAYS } from "./records-schema.js";
+import { RULESET, TOTAL_DAYS } from "./records-schema.js";
+import { SCRUM_REPORTS, beginScrumDay, finishScrumDay, finishScrumRun, handleScrum, initScrum, markMorningDelivery } from "./scrum.js";
 
 export const PHASES = {
   arrive: ["09:00", "출근"],
+  scrum: ["09:30", "데일리 스크럼"],
   assign: ["09:30", "업무 배분"],
   morning: ["10:00", "오전 코딩"],
   lunch: ["12:00", "점심시간"],
@@ -13,7 +15,7 @@ export const PHASES = {
   leave: ["18:00", "퇴근"],
   overtime: ["18:00", "야근"],
 };
-export const RELATION_NAMES = { park: "박 선임", lee: "이 선임", ...Object.fromEntries(Object.entries(DEPARTMENTS).map(([id, d]) => [id, d.name])) };
+export const RELATION_NAMES = { park: "박 대리", lee: "이 대리", ...Object.fromEntries(Object.entries(DEPARTMENTS).map(([id, d]) => [id, d.name])) };
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const range = (length) => Array.from({ length }, (_, i) => i);
@@ -37,15 +39,16 @@ function draw(s) {
   return s.rng / 2 ** 32;
 }
 
-export function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0], id = crypto.randomUUID()) {
+export function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0], id = crypto.randomUUID(), ruleset = RULESET) {
   const run = {
-    id, seed, rng: seed, moves: [], day: 1, deadline: TOTAL_DAYS, shift: 0, hp: 100, score: 0, scope: 0, progress: 0,
+    id, seed, ruleset, rng: seed, moves: [], day: 1, deadline: TOTAL_DAYS, shift: 0, hp: 100, score: 0, scope: 0, progress: 0,
     phase: "arrive", ending: null, completedDay: null, nextMeeting: 0, effects: [],
     relations: Object.fromEntries(Object.keys(RELATION_NAMES).map((key) => [key, 0])),
     stats: { coding: 0, meetings: 0, overtime: 0, onTime: 0, planning: 0, design: 0, paste: 0, calledSimple: 0, actuallySimple: 0 },
     achievements: [],
     requestCount: {},
   };
+  if (ruleset >= 2) initScrum(run);
   const random = () => draw(run);
   run.eventDeck = shuffle(range(OFFICE_EVENTS.length), random);
   run.departmentOrder = shuffle(Object.keys(DEPARTMENTS), random);
@@ -78,6 +81,7 @@ function startDay(s) {
   s.request = DEPARTMENTS[s.department].requests[order[count % order.length]];
   if (s.relations[s.department] < 4) s.requestCount[s.department] = count + 1;
   s.effects = [];
+  if (s.scrum) beginScrumDay(s, currentMission(s)?.title ?? null);
 }
 
 function change(s, effect) {
@@ -128,6 +132,7 @@ export function submitSolution(s) {
   s.cost = 0;
   s.solvedToday = true;
   s.progress++;
+  if (s.scrum && s.phase === "morning") markMorningDelivery(s);
   change(s, { score: 14, hp: -3 });
   s.effects = ["기능 검수를 통과했다."];
   if (s.phase === "morning" && s.remaining >= 35) {
@@ -154,6 +159,7 @@ export function recordPaste(s, attempts = 1) {
 }
 
 function finish(s, id) {
+  if (s.scrum) finishScrumRun(s, id === "deadline" && s.day === TOTAL_DAYS);
   s.ending = id;
   s.completedDay = ENDINGS[id].cleared ? s.day : null;
 }
@@ -168,6 +174,7 @@ function finishShift(s) {
   }
   const next = isFriday(s.day) ? s.day + 3 : s.day + 1;
   if (next > s.deadline || next > TOTAL_DAYS) return finish(s, "deadline");
+  if (s.scrum) finishScrumDay(s);
   s.day = next;
   startDay(s);
 }
@@ -176,22 +183,27 @@ function choice(id, label, detail = "", disabled = false) {
   return { id, label, detail, disabled };
 }
 
+export function needsAssignment(s) {
+  return !s.scrum || s.scope >= 3 || s.scrum.event?.id === "director" ||
+    (!!currentMission(s) && (s.shift === 1 || s.day % 7 === 1 || isFriday(s.day)));
+}
+
 function handleAssignment(s, id) {
   if (id.startsWith("ticket-")) return chooseTickets(s, [Number(id.slice(7))], {}, "예상 시간만 적힌 업무표에 이름을 적었다.");
-  if (id === "volunteer") return chooseTickets(s, [s.available.at(-1)], { score: 20 }, "정 수석이 신입의 이름을 수첩에 적었다. 평가 +20.");
+  if (id === "volunteer") return chooseTickets(s, [s.available.at(-1)], { score: 20 }, "정 부장이 신입의 이름을 수첩에 적었다. 평가 +20.");
   if (id === "refuse") {
     const backed = s.relations.lee >= 2 || s.relations.park >= 2;
-    return chooseTickets(s, [], { score: backed ? -1 : -6 }, backed ? "선임이 이미 맡은 일을 증언했다." : "김 과장이 기존 업무부터 끝내라고 했다. 평가 −6.");
+    return chooseTickets(s, [], { score: backed ? -1 : -6 }, backed ? "대리가 이미 맡은 일을 증언했다." : "김 과장이 기존 업무부터 끝내라고 했다. 평가 −6.");
   }
   if (id === "trade") {
     const ticket = s.parkPriority.find((index) => s.available.includes(index)) ?? s.available[0];
-    return chooseTickets(s, [ticket], { park: -1, lee: 1, minutes: 35 }, "박 선임이 유리한 업무를 양보했다. 지난번에 도와준 얘기를 꺼냈다.");
+    return chooseTickets(s, [ticket], { park: -1, lee: 1, minutes: 35 }, "박 대리가 유리한 업무를 양보했다. 지난번에 도와준 얘기를 꺼냈다.");
   }
   s.waits++;
   change(s, { meeting: 20 });
   const taken = s.parkPriority.find((i) => s.available.includes(i)) ?? s.available[0];
   s.available = s.available.filter((i) => i !== taken);
-  s.effects = [`박 선임이 ${s.tickets[taken].name}에 먼저 이름을 적었다.`];
+  s.effects = [`박 대리가 ${s.tickets[taken].name}에 먼저 이름을 적었다.`];
   if (s.waits === 2) return chooseTickets(s, s.available.slice(-2), { score: -3 }, "회의가 끝나기 직전, 김 과장이 남은 어려운 두 건을 함께 넘겼다.");
 }
 
@@ -221,6 +233,8 @@ function handleNegotiation(s, id) {
     if (key === "planning" || key === "design") s.stats[key] += minutes;
     s.effects = [agreed ? "담당자가 합의한 범위 안으로 요청을 정리했다." : "요청을 보류했다. 다음 회의 때 책임 소재를 따지겠다는 답장이 왔다."];
   }
+  if (s.scrum && key === "planning") s.scrum.today.planning += disruption;
+  if (s.scrum && key === "qa") s.scrum.today.bugs += scope;
   s.remaining = 270 - disruption;
   s.phase = "afternoon";
 }
@@ -231,7 +245,7 @@ function handleBoss(s, id) {
     yes: [{ scope: Math.max(1, 5 - support), hp: -12, score: 16, sales: 1, design: 1, deadline: -1 }, "그날 회의록에는 ‘개발 가능’ 두 글자만 남았다. 납품일도 당겨졌다."],
     no: [{ scope: -1, hp: -4, score: support ? -3 : -12, sales: -2, qa: 1 }, "QA가 검수 시간을 확인해 줬다. 영업팀은 회의 끝나고 다시 보자고 했다."],
     trim: [{ scope: support ? -3 : 1, hp: -5, score: 5, planning: 1, qa: 1 }, support ? "평소 맞춰 일한 부서가 축소안에 서명했다." : "출시 범위를 좁혔다. 끝까지 남은 추가 요청은 한 건이다."],
-    joke: [{ scope: 2, hp: -9, score: -16, sales: -3, lee: 1 }, "이 선임만 웃었다. 영업팀이 의자를 돌려 앉았다."],
+    joke: [{ scope: 2, hp: -9, score: -16, sales: -3, lee: 1 }, "이 대리만 웃었다. 영업팀이 의자를 돌려 앉았다."],
   };
   const [effect, message] = outcomes[id];
   change(s, { ...effect, meeting: 95 });
@@ -250,14 +264,17 @@ export function options(s) {
         choice("automate", "검수표를 자동화한다", "오전 업무 시간 +90분"),
         choice("arrive", "오늘은 수동으로 검수한다"),
       ];
-      return [choice("arrive", "업무표 확인")];
+      return [choice("arrive", s.scrum ? "데일리 스크럼 참석" : "업무표 확인")];
+    case "scrum":
+      if (!s.scrum.event) return [choice("scrumQuick", "짧게 보고하고 회의를 마친다", "15분")];
+      return SCRUM_REPORTS.map(({ id, label, detail }) => choice(id, label, detail, id === "scrumPromise" && !currentMission(s)));
     case "assign":
       return [
         ...s.available.map((i) => choice(`ticket-${i}`, s.tickets[i].name, `예상 ${s.tickets[i].estimate}`)),
         choice("wait", "동료가 고를 때까지 기다린다", s.waits ? "회의가 곧 끝난다 · 20분" : "선택을 본다 · 20분"),
         choice("volunteer", "가장 어려워 보이는 일에 자원한다", "인사평가 +20"),
-        choice("refuse", "기존 프로젝트를 이유로 거절한다", "인사평가 하락 · 선임이 증언하면 완화"),
-        choice("trade", "박 선임과 업무를 교환한다", "박 선임 관계 +2 이상 필요", s.relations.park < 2),
+        choice("refuse", "기존 프로젝트를 이유로 거절한다", "인사평가 하락 · 대리가 증언하면 완화"),
+        choice("trade", "박 대리와 업무를 교환한다", "박 대리 관계 +2 이상 필요", s.relations.park < 2),
       ];
     case "morning":
     case "afternoon":
@@ -273,8 +290,8 @@ export function options(s) {
     case "lunch":
       return [
         choice("rest", "혼자 먹고 잠깐 쉰다", "체력 +10"),
-        choice("park", "박 선임과 밥을 먹는다", "체력 +5 · 박 선임 관계 +2"),
-        choice("help", "이 선임과 먹고 밀린 일을 돕는다", "체력 +3 · 이 선임 관계 +2 · 추가 일감을 맡을 수 있음"),
+        choice("park", "박 대리와 밥을 먹는다", "체력 +5 · 박 대리 관계 +2"),
+        choice("help", "이 대리와 먹고 밀린 일을 돕는다", "체력 +3 · 이 대리 관계 +2 · 추가 일감을 맡을 수 있음"),
         choice("kim", "김 과장 대신 전화를 받고 같이 먹는다", "체력 +4 · 인사평가 +8"),
       ];
     case "negotiate":
@@ -310,14 +327,24 @@ export function act(s, id) {
   switch (s.phase) {
     case "arrive":
       if (s.shift !== 9 || id === "automate") change(s, s.event.effect);
-      change(s, { meeting: 30 + s.nextMeeting });
+      change(s, { meeting: (s.scrum ? 0 : 30) + s.nextMeeting });
       s.nextMeeting = 0;
       if (id === "automate") {
         s.stats.calledSimple++;
         s.effects = ["검수표를 자동으로 만들었다. 김 과장이 절약된 90분을 보고 ‘간단한 일’ 90분을 추가했다."];
       }
-      s.phase = "assign";
+      s.phase = s.scrum ? "scrum" : "assign";
       break;
+    case "scrum": {
+      const report = handleScrum(s, id, currentMission(s)?.title);
+      change(s, report.effect);
+      const assign = needsAssignment(s);
+      s.scrum.assignment = assign;
+      if (assign) change(s, { meeting: 15 });
+      s.effects = [...report.effects, assign ? "이어서 별도 업무 배분 회의 15분." : "오늘은 기존 업무를 이어서 한다."];
+      s.phase = assign ? "assign" : "morning";
+      break;
+    }
     case "assign":
       handleAssignment(s, id);
       break;
@@ -336,6 +363,7 @@ export function act(s, id) {
         const spent = Math.min(s.cost, s.remaining);
         chargeCoding(s, spent);
         s.cost -= spent;
+        if (s.scrum) s.scrum.today.research += spent;
         s.effects = [`재현·자료 조사에 ${spent}분을 썼다. 이 업무에 ${codingCost(s)}분이 더 필요하다.`];
       } else {
         s.coffee = true;
@@ -347,10 +375,10 @@ export function act(s, id) {
       if (id === "help") {
         const traded = s.relations.lee >= 2;
         change(s, { hp: 3, lee: 2, scope: traded ? -1 : 1 });
-        s.effects = [traded ? "이 선임이 이번엔 밀린 검수를 같이 끝냈다." : "이 선임이 부탁한 버그를 맡았다. 다음에 도움이 필요하면 먼저 말하라고 했다."];
+        s.effects = [traded ? "이 대리가 이번엔 밀린 검수를 같이 끝냈다." : "이 대리가 부탁한 버그를 맡았다. 다음에 도움이 필요하면 먼저 말하라고 했다."];
       } else if (id === "park") {
         change(s, { hp: 5, park: 2 });
-        s.effects = ["박 선임이 내일 회의에서 먼저 말을 걸라고 했다."];
+        s.effects = ["박 대리가 내일 회의에서 먼저 말을 걸라고 했다."];
       } else if (id === "kim") {
         change(s, { hp: 4, score: 8 });
         s.effects = ["김 과장  ‘위에는 된다고 해야 하고 아래에는 해달라고 해야 하네. 같이 먹어줘서 고맙다.’"];
@@ -396,8 +424,8 @@ export function recordFor(s) {
   return { id: s.id, ending: s.ending, day: s.day, progress: s.progress, ...s.stats, hp: s.hp, completedDay: s.completedDay, achievements: [...s.achievements] };
 }
 
-export function replayRun({ id, seed, moves }) {
-  const run = newRun(seed, id);
+export function replayRun({ id, seed, moves, ruleset = RULESET }) {
+  const run = newRun(seed, id, ruleset);
   for (const move of moves) {
     if (run.ending) return null;
     if (typeof move === "number") {

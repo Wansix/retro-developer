@@ -1,7 +1,8 @@
 import { BOSS_LINES, MISSIONS, PASTE_LINES, PROLOGUE_2026, SCENE_2006, TRAVEL_LINES } from "./missions.js";
 import { DEPARTMENTS, ENDINGS, EPILOGUE, LUNCH } from "./office-content.js";
-import { PHASES, RELATION_NAMES, act, canSubmit, codingCost, currentMission, isCoding, isFriday, newRun, options, recordFor, recordPaste, submitSolution } from "./office.js";
-import { METRICS, RULESET, formatDate } from "./records-schema.js";
+import { PHASES, RELATION_NAMES, act, canSubmit, codingCost, currentMission, isCoding, isFriday, needsAssignment, newRun, options, recordFor, recordPaste, submitSolution } from "./office.js";
+import { FIRST_RULESET, METRICS, formatDate } from "./records-schema.js";
+import { SCRUM_REPORTS } from "./scrum.js";
 import { initRecords, openRecords, syncRecord } from "./records.js";
 import { initDialogueSound, typeDialogue } from "./dialogue.js";
 
@@ -163,7 +164,7 @@ function checkpoint() {
 }
 
 const schedule = [
-  ["arrive", "출근"], ["assign", "업무 배분"], ["morning", "코딩 미션"],
+  ["arrive", "출근"], ["scrum", "데일리 스크럼"], ["assign", "업무 배분"], ["morning", "코딩 미션"],
   ["lunch", "점심시간"], ["negotiate", "코딩·협상"], ["report", "진행 보고"], ["leave", "퇴근"],
 ];
 for (const [key, label] of schedule) {
@@ -231,6 +232,8 @@ function hud() {
   $("bar-progress").style.width = `${100 * state.progress / MISSIONS.length}%`;
   $("hud-score").textContent = state.score;
   $("hud-scope").textContent = `${state.scope}건`;
+  $("scrum-trust").classList.toggle("hidden", !state.scrum);
+  if (state.scrum) $("hud-trust").textContent = `${state.stats.reportTrust}/100`;
   $("relations").replaceChildren(...Object.entries(RELATION_NAMES).flatMap(([id, name]) => {
     const dt = document.createElement("dt");
     const dd = document.createElement("dd");
@@ -241,6 +244,11 @@ function hud() {
   }));
   const active = ({ afternoon: "negotiate", overtime: "leave" })[state.phase] ?? state.phase;
   for (const node of $("schedule").children) {
+    if (node.dataset.step === "scrum") node.classList.toggle("hidden", !state.scrum);
+    if (node.dataset.step === "assign") {
+      node.textContent = state.scrum ? "스크럼 후  업무 배분" : "09:30  업무 배분";
+      node.classList.toggle("hidden", !(state.scrum?.assignment ?? needsAssignment(state)));
+    }
     if (node.dataset.step === active) node.setAttribute("aria-current", "step");
     else node.removeAttribute("aria-current");
   }
@@ -250,11 +258,12 @@ function phaseStory() {
   const phase = state.phase;
   const [clock, title] = PHASES[phase];
   const events = phase === "arrive" ? state.event.title : title;
-  $("shift-clock").textContent = clock;
+  $("shift-clock").textContent = phase === "assign" && state.scrum ? "스크럼 직후" : clock;
   $("shift-title").textContent = events;
   switch (phase) {
     case "arrive": return state.event.text;
-    case "assign": return "김 과장이 오늘 업무표를 돌린다. 정 수석이 지켜보고 있고, 박 선임은 이미 볼펜 뚜껑을 열었다.";
+    case "scrum": return state.scrum.event?.text ?? "어제 한 일, 오늘 할 일, 막힌 문제만 짧게 공유한다.";
+    case "assign": return "김 과장이 오늘 업무표를 돌린다. 정 부장이 지켜보고 있고, 박 대리는 이미 볼펜 뚜껑을 열었다.";
     case "morning":
     case "afternoon":
     case "overtime": {
@@ -281,6 +290,42 @@ function phaseStory() {
       return `기능 ${state.progress}/${MISSIONS.length} · 추가 일감 ${state.scope}건. 김 과장이 현황을 묻는다.`;
     case "leave": return "김 과장이 벽시계를 한 번 보고 자리에 앉는다.";
   }
+}
+
+function renderScrum() {
+  const active = state.phase === "scrum";
+  $("scrum-panel").classList.toggle("hidden", !active);
+  if (!active) {
+    $("scrum-history").open = false;
+    return;
+  }
+  const { yesterday, previousPromise, history } = state.scrum;
+  $("scrum-yesterday").textContent = yesterday
+    ? yesterday.mission ? `${yesterday.mission} · ${yesterday.completed ? "검수 통과" : "미완료"}` : "필수 기능 검수가 끝난 상태였다."
+    : "오늘이 첫 출근이다.";
+  const totals = yesterday ? [
+    ["코딩", `${yesterday.coding}분`], ["기획 협의", `${yesterday.planning}분`],
+    ["자료 조사", `${yesterday.research}분`], ["QA 발견", `${yesterday.bugs}건`],
+  ] : [];
+  $("scrum-totals").replaceChildren(...totals.map(([label, value]) => {
+    const item = document.createElement("div");
+    const dt = document.createElement("dt");
+    const dd = document.createElement("dd");
+    dt.textContent = label;
+    dd.textContent = value;
+    item.append(dt, dd);
+    return item;
+  }));
+  const prior = history.at(-1);
+  const reportLabel = SCRUM_REPORTS.find(({ id }) => id === prior?.kind)?.label ?? "짧게 보고했다";
+  $("scrum-previous").textContent = prior ? `어제 보고 · ${reportLabel} · ${prior.minutes}분` : "";
+  const plan = currentMission(state)?.title ?? "남은 추가 일감과 검수";
+  $("scrum-today").textContent = `오늘 할 일 · ${plan}${needsAssignment(state) ? " · 스크럼 뒤 업무 배분" : ""}`;
+  const promises = history.flatMap(({ promise }) =>
+    promise ? [`${promise.day}일차 · ${promise.mission} 점심 전 배포 · ${promise.result ?? "확인 대기"}`] : []);
+  $("scrum-history").classList.toggle("hidden", !promises.length);
+  $("scrum-history").open = !!previousPromise;
+  replaceList($("scrum-promises"), promises.reverse());
 }
 
 function submissionNextAction(choices) {
@@ -370,18 +415,20 @@ function renderOffice(focus = false) {
   hud();
   $("shift-story").textContent = phaseStory();
   replaceList($("shift-effects"), state.effects);
+  renderScrum();
   renderChoices();
   renderCoding();
   checkpoint();
   if (focus) $("shift-title").focus({ preventScroll: true });
   if (state.phase === "arrive") {
     bossSay(state.day === 1
-      ? "정 수석이 기술 방향을 잡고, 나랑 박 선임, 이 선임이 쇼핑몰을 같이 맡는다. 자네는 오늘부터 사원이야."
+      ? "정 부장이 기술 방향을 잡고, 나랑 박 대리, 이 대리가 쇼핑몰을 같이 맡는다. 자네는 오늘부터 사원이야."
       : "출근했구나. 오늘 일정부터 보자.");
   } else if (isCoding(state.phase) && currentMission(state) && !state.solvedToday) {
     bossSay(currentMission(state).boss);
   } else {
     bossSay(({
+      scrum: "신입, 어제 뭐 했고 오늘 뭐 할 거야? 막힌 게 있으면 같이 말해줘.",
       assign: "인원은 그대로고 할 일은 늘었어. 업무표 보고 이야기하자.",
       lunch: "밥은 같이 먹자. 전화는 이번엔 내가 받을게.",
       negotiate: "합의한 건 메일로 남겨 둬. 내가 고객한테 설명할 때도 필요해.",
@@ -396,11 +443,16 @@ function enterOffice(resume = false) {
   state = saved?.state ?? newRun();
   draft = saved?.draft ?? null;
   if (saved?.state) {
+    state.ruleset ??= FIRST_RULESET;
     // Older saves store the current day's event and its narrative text verbatim.
-    const rename = (text) => text.replaceAll("김 책임", "김 과장").replaceAll("책임님, 커피", "과장님, 커피");
+    const rename = (text) => text.replaceAll("김 책임", "김 과장").replaceAll("책임님, 커피", "과장님, 커피")
+      .replaceAll("선임이었다", "대리였다").replaceAll("선임이", "대리가")
+      .replaceAll("선임은", "대리는").replaceAll("선임과", "대리와")
+      .replaceAll("선임", "대리").replaceAll("수석", "부장");
     state.event.title = rename(state.event.title);
     state.event.text = rename(state.event.text);
     state.effects = state.effects.map(rename);
+    for (const ticket of state.tickets) ticket.reveal = rename(ticket.reveal);
   }
   shownMission = null;
   show("screen-office");
@@ -530,7 +582,7 @@ function showResult(record) {
   $("ending-title").textContent = ending.title;
   $("ending-sub").textContent = "미래소프트™ 개발자 생활 결산표";
   $("ending-desc").textContent = ending.text;
-  const rows = METRICS.map(([key, label, unit]) => [
+  const rows = METRICS.filter(([key]) => key in record).map(([key, label, unit]) => [
     label,
     key === "completedDay"
       ? record[key] === null ? "미완료" : `입사 ${record[key]}일차 · ${formatDate(record[key])}`
@@ -562,7 +614,7 @@ function endRun() {
   if (record.completedDay && (!best || record.completedDay < best.completedDay)) saveLocal(BEST_KEY, record);
   $("ending-sync").textContent = "";
   const version = ++syncVersion;
-  syncRecord(record, { ruleset: RULESET, id: state.id, seed: state.seed, moves: state.moves }).then((message) => {
+  syncRecord(record, { ruleset: state.ruleset, id: state.id, seed: state.seed, moves: state.moves }).then((message) => {
     if (version === syncVersion) $("ending-sync").textContent = message;
   });
   if (!ENDINGS[record.ending].cleared) return showResult(record);

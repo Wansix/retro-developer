@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { replayRun } from "../../src/office.js";
-import { CATEGORIES, RULESET } from "../../src/records-schema.js";
+import { CATEGORIES, FIRST_RULESET, RULESET } from "../../src/records-schema.js";
 
 const COOKIE = "retro_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 14;
@@ -94,9 +94,9 @@ async function authenticate(context, action, body) {
 }
 
 async function saveRun(db, account, body) {
-  if (body?.ruleset !== RULESET || typeof body.id !== "string" || !UUID.test(body.id) || !integer(body.seed, 0, 0xffffffff) ||
+  if (!integer(body?.ruleset, FIRST_RULESET, RULESET) || typeof body.id !== "string" || !UUID.test(body.id) || !integer(body.seed, 0, 0xffffffff) ||
     !Array.isArray(body.moves) || !integer(body.moves.length, 1, 500)) return problem("결산 기록이 올바르지 않습니다.", 400);
-  const summary = replayRun({ id: body.id.toLowerCase(), seed: body.seed, moves: body.moves });
+  const summary = replayRun({ id: body.id.toLowerCase(), seed: body.seed, moves: body.moves, ruleset: body.ruleset });
   if (!summary) return problem("결산 기록이 올바르지 않습니다.", 400);
   const result = await db.prepare("INSERT INTO runs VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING")
     .bind(summary.id, account.id, JSON.stringify(summary), ts()).run();

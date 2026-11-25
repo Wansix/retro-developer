@@ -3,12 +3,14 @@ import test from "node:test";
 import { ENDINGS, OFFICE_EVENTS } from "../src/office-content.js";
 import { MISSIONS } from "../src/missions.js";
 import { act, canSubmit, isFriday, newRun, options, recordFor, recordPaste, replayRun, submitSolution } from "../src/office.js";
+import { FIRST_RULESET, RULESET } from "../src/records-schema.js";
 
-function play(style, seed = 417) {
-  const run = newRun(seed);
+function play(style, seed = 417, ruleset = RULESET) {
+  const run = newRun(seed, undefined, ruleset);
   for (let turn = 0; turn < 400 && !run.ending; turn++) {
     const choices = {
       arrive: run.shift === 9 ? "automate" : "arrive",
+      scrum: run.scrum?.event ? "scrumHonest" : "scrumQuick",
       assign: "refuse",
       lunch: { promotion: "kim", teamwork: "help", balance: "park" }[style] ?? "rest",
       negotiate: ["balance", "promotion", "teamwork"].includes(style)
@@ -45,10 +47,15 @@ test("all six endings are reachable and reproduce the same saved metrics on repl
   }
   assert.equal(play("balance").stats.overtime, 0);
   assert.equal(play("deadline").day, 30);
+  assert.ok(play("deadline").achievements.includes("스크럼 마스터"));
+  const legacy = play("balance", 417, FIRST_RULESET);
+  assert.equal(legacy.ending, "balance");
+  assert.equal(legacy.stats.scrums, undefined);
+  assert.deepEqual(replayRun(legacy), recordFor(legacy));
 });
 
 test("waiting twice exposes two jobs and relations unlock a trade on later days", () => {
-  const run = newRun(2);
+  const run = newRun(2, undefined, FIRST_RULESET);
   act(run, "arrive");
   assert.equal(act(run, "trade"), false);
   assert.equal(run.available.length, 5);
@@ -79,6 +86,7 @@ test("replay rejects incomplete games and impossible actions and reproduces past
   assert.equal(replayRun({ ...run, moves: ["arrive", 3] }), null);
 
   act(run, "arrive");
+  act(run, "scrumHonest");
   act(run, "refuse");
   assert.equal(recordPaste(run), 1);
   assert.equal(recordPaste(run), 2);
@@ -89,4 +97,57 @@ test("replay rejects incomplete games and impossible actions and reproduces past
   assert.equal(submitSolution(run), false);
   assert.equal(recordPaste(run), 0);
   assert.equal(replayRun(run), null);
+});
+
+function step(run, moves) {
+  for (const move of moves) assert.ok(act(run, move), `${run.day} ${run.phase} ${move}`);
+}
+
+test("the report and the separate assignment consume the actual morning budget", () => {
+  const honest = newRun(417);
+  const blame = newRun(417);
+  step(honest, ["arrive"]);
+  assert.equal(honest.phase, "scrum");
+  assert.equal(options(honest).length, 4);
+  step(honest, ["scrumHonest"]);
+  step(blame, ["arrive"]);
+  const before = blame.stats.meetings;
+  step(blame, ["scrumRequirements"]);
+  assert.equal(blame.phase, "assign");
+  assert.equal(blame.stats.scrumMinutes - honest.stats.scrumMinutes, 40);
+  assert.equal(blame.stats.meetings - before - blame.stats.scrumMinutes, 15);
+  assert.equal(honest.remaining - blame.remaining, 40);
+  assert.ok(!act(blame, "scrumRequirements"));
+  assert.equal(blame.stats.scrums, 1);
+});
+
+test("an actual morning delivery fulfills a promise; an afternoon delivery still misses it", () => {
+  for (const morningDelivery of [true, false]) {
+    const run = newRun(417);
+    step(run, ["arrive", "scrumPromise", "refuse"]);
+    if (morningDelivery) assert.ok(submitSolution(run));
+    step(run, ["next", "park", "document"]);
+    if (!morningDelivery) assert.ok(submitSolution(run));
+    step(run, ["next", "reportBrief", "leave", "arrive"]);
+    const { yesterday, previousPromise, event } = run.scrum;
+    assert.equal(yesterday.mission, MISSIONS[0].title);
+    assert.equal(yesterday.completed, true);
+    assert.equal(yesterday.coding, 45);
+    assert.equal(previousPromise.result, morningDelivery ? "이행" : "미이행");
+    assert.equal(run.stats.promisesKept, morningDelivery ? 1 : 0);
+    assert.equal(run.stats.promisesMissed, morningDelivery ? 0 : 1);
+    assert.equal(run.stats.reportTrust, morningDelivery ? 75 : 61);
+    assert.deepEqual(JSON.parse(JSON.stringify(run)).scrum.history, run.scrum.history);
+    if (morningDelivery) {
+      assert.equal(event, null);
+      assert.deepEqual(options(run).map(({ id }) => id), ["scrumQuick"]);
+      step(run, ["scrumQuick"]);
+      assert.equal(run.phase, "morning");
+      assert.equal(run.stats.scrumMinutes, 45);
+    } else {
+      assert.equal(event.id, "caught");
+      step(run, ["scrumPromise"]);
+      assert.equal(run.stats.reportTrust, 56);
+    }
+  }
 });
