@@ -61,6 +61,11 @@ function addChatTo(logId, text, who) {
   copy.append(label);
   div.append(copy);
   log.appendChild(div);
+  if (logId === "chat-log" && who === "me") {
+    copy.append(text);
+    log.scrollTop = log.scrollHeight;
+    return;
+  }
   return dialogueLine(copy, text, {
     voice: who,
     ...(firstDay ? { letterMs: 64, maxMs: 2400 } : {}),
