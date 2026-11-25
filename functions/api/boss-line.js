@@ -68,7 +68,9 @@ export async function onRequestPost({ request, env }) {
     const data = await res.json();
     const line = data?.choices?.[0]?.message?.content?.trim() || "";
     if (!line) return new Response("empty", { status: 503 });
-    return Response.json({ line: line.slice(0, 120) });
+    const model = typeof data.model === "string" ? data.model.trim().split("/").at(-1) : "";
+    const source = /^(?:gpt-\d+(?:\.\d+)?-)?luna(?:$|[-:@])/i.test(model) ? "luna" : "AI";
+    return Response.json({ line: line.slice(0, 120), source });
   } catch {
     return new Response("llm error", { status: 503 });
   }

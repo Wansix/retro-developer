@@ -414,17 +414,17 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 #output.error { color: #d07070; }
 #output.ok { color: #8fd05a; }
 
-/* AI 생성 대사 표시 (테스트용) */
+/* AI 생성 대사 출처 */
 .ai-tag {
   display: inline-block;
-  margin-left: 0.4rem;
-  padding: 0 0.3rem;
-  font-size: 0.65rem;
-  vertical-align: super;
-  color: #e8c860;
-  border: 1px solid #e8c860;
-  border-radius: 3px;
-  opacity: 0.85;
+  margin-inline-start: .35rem;
+  padding: .07rem .3rem;
+  border-radius: 2px;
+  background: #37452d;
+  color: #fbf4db;
+  font-size: .7rem;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 :root { color-scheme: dark; }

@@ -181,19 +181,22 @@ function replaceList(parent, values) {
   }));
 }
 
-function bossSay(line, generated = false) {
+function bossSay(line, source = null) {
   bossVersion++;
   bossTyping?.abort();
   bossTyping = new AbortController();
+  const { signal } = bossTyping;
   const target = $("boss-line");
   target.replaceChildren();
-  dialogueLine(target, line, { voice: "boss", maxMs: 700, signal: bossTyping.signal });
-  if (generated) {
+  const typing = dialogueLine(target, line, { voice: "boss", maxMs: 700, signal });
+  if (!source) return;
+  typing.then(() => {
+    if (signal.aborted) return;
     const tag = document.createElement("span");
     tag.className = "ai-tag";
-    tag.textContent = "AI";
+    tag.textContent = source;
     target.appendChild(tag);
-  }
+  });
 }
 
 async function react(kind) {
@@ -204,11 +207,13 @@ async function react(kind) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind, day: state.day, hp: state.hp, overtime: state.stats.overtime }),
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return;
     const data = await res.json();
-    if (version === bossVersion && typeof data.line === "string" && data.line.trim()) bossSay(data.line.trim().slice(0, 120), true);
+    if (version === bossVersion && typeof data.line === "string" && data.line.trim()) {
+      bossSay(data.line.trim().slice(0, 120), data.source === "luna" ? "luna" : "AI");
+    }
   } catch { /* The scripted dialogue is already visible. */ }
 }
 
