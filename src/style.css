@@ -122,6 +122,20 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   border: 1px solid #8a7f5a;
   color: #3a3423;
 }
+.bubble.with-portrait {
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+}
+.bubble.with-portrait img {
+  flex: none;
+  image-rendering: pixelated;
+}
+.bubble.with-portrait div {
+  min-width: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
 
 #agent-term-wrap {
   border: 1px solid #2a3a24;

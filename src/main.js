@@ -42,14 +42,30 @@ function dialogueLine(parent, text, options) {
 
 function addChatTo(logId, text, who) {
   const log = $(logId);
+  const firstDay = logId === "chat-log-2006";
   const div = document.createElement("div");
   div.className = `bubble ${who === "me" ? "player" : who}`;
+  if (firstDay && who === "boss") {
+    const portrait = document.createElement("img");
+    portrait.src = "src/assets/kim-manager.svg";
+    portrait.alt = "";
+    portrait.width = 42;
+    portrait.height = 46;
+    div.classList.add("with-portrait");
+    div.append(portrait);
+  }
+  const copy = document.createElement("div");
   const label = document.createElement("span");
   label.className = "who";
   label.textContent = WHO_LABEL[who] || who;
-  div.appendChild(label);
+  copy.append(label);
+  div.append(copy);
   log.appendChild(div);
-  return dialogueLine(div, text, { voice: who, onFrame: () => { log.scrollTop = log.scrollHeight; } });
+  return dialogueLine(copy, text, {
+    voice: who,
+    ...(firstDay ? { letterMs: 64, maxMs: 2400 } : {}),
+    onFrame: () => { log.scrollTop = log.scrollHeight; },
+  });
 }
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
