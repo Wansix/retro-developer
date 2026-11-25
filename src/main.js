@@ -257,7 +257,7 @@ function phaseStory() {
       if (!currentMission(state)) return `${budget} 필수 기능 검수가 끝났다. 남은 추가 일감을 정리하고 퇴근하면 배포할 수 있다.`;
       if (state.solvedToday) return `${budget} 오늘 배정된 코딩 미션은 검수를 통과했다.`;
       const needed = codingCost(state);
-      return `${budget} ${state.remaining >= needed ? `배정 업무와 미션 제출에 ${needed}분이 필요하다.` : `제출에는 ${needed}분이 필요하다. 사전 조사로 시간을 나눠 쓸 수 있다.`}`;
+      return state.remaining >= needed ? `${budget} 배정 업무와 미션 제출에 ${needed}분이 필요하다.` : budget;
     }
     case "lunch": {
       const [who, line] = LUNCH[(state.shift - 1) % LUNCH.length];
@@ -278,8 +278,26 @@ function phaseStory() {
   }
 }
 
+function submissionNextAction(choices) {
+  if (!isCoding(state.phase) || !currentMission(state) || state.solvedToday || state.remaining >= codingCost(state)) return;
+  const prepare = choices.find(({ id, disabled }) => id === "prepare" && !disabled);
+  return state.phase !== "overtime" && prepare ? prepare : choices.find(({ id }) => id === "next");
+}
+
+function takeOfficeAction(id) {
+  if (busy || !act(state, id)) return;
+  if (state.ending) {
+    endRun();
+    return;
+  }
+  renderOffice(true);
+  if (id === "coffee") react("coffee");
+}
+
 function renderChoices() {
-  $("choices").replaceChildren(...options(state).map(({ id, label, detail, disabled }) => {
+  const choices = options(state);
+  const inline = submissionNextAction(choices);
+  $("choices").replaceChildren(...choices.filter(({ id }) => id !== inline?.id).map(({ id, label, detail, disabled }) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "act-btn";
@@ -292,15 +310,7 @@ function renderChoices() {
       description.textContent = detail;
       btn.append(description);
     }
-    btn.addEventListener("click", () => {
-      if (busy || !act(state, id)) return;
-      if (state.ending) {
-        endRun();
-        return;
-      }
-      renderOffice(true);
-      if (id === "coffee") react("coffee");
-    });
+    btn.addEventListener("click", () => takeOfficeAction(id));
     return btn;
   }));
 }
@@ -332,6 +342,19 @@ function renderCoding() {
   const cost = codingCost(state);
   $("btn-submit").textContent = `업무 제출 · ${cost}분`;
   $("btn-submit").disabled = busy || !canSubmit(state);
+  const missing = cost - state.remaining;
+  const next = submissionNextAction(options(state));
+  const followup = next?.id === "prepare"
+    ? state.phase === "morning" ? "지금 조사한 만큼 오후에 필요한 시간이 줄어요." : "지금 조사해 두면 야근에서 이어서 할 수 있어요."
+    : { morning: "점심을 넘기고 오후 업무 시간에 다시 제출할 수 있어요.", afternoon: "보고를 마친 뒤 야근을 선택하면 오늘 업무를 이어서 할 수 있어요.", overtime: "오늘 업무가 끝나면 다음 출근 때 다시 도전할 수 있어요." }[state.phase];
+  $("submit-help").classList.toggle("hidden", !busy && missing <= 0);
+  $("submit-status").textContent = busy
+    ? "Python 실행 중이에요. 결과가 나올 때까지 기다려 주세요."
+    : missing > 0 ? `시간이 ${missing}분 부족해요. 남은 ${state.remaining}분, 제출에 ${cost}분 필요. ${followup}` : "";
+  const nextButton = $("submit-next");
+  nextButton.classList.toggle("hidden", !next || busy);
+  nextButton.textContent = next?.id === "prepare" ? `사전 조사 · ${Math.min(state.cost, state.remaining)}분` : next?.label ?? "";
+  nextButton.onclick = next ? () => takeOfficeAction(next.id) : null;
   $("btn-run").disabled = busy;
   editor.disabled = busy;
   resetIdle();

@@ -390,6 +390,15 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 
 .actions { display: flex; gap: 0.6rem; }
 .actions .btn { margin-top: 0; }
+.submit-help {
+  background: #292213;
+  border-left: 3px solid #bf9753;
+  color: #f3deb0;
+  padding: .6rem .75rem;
+  font-size: .92rem;
+  line-height: 1.6;
+}
+.submit-help .btn { margin-top: .45rem; }
 
 #output {
   background: #060a05;
