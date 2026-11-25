@@ -3,6 +3,7 @@ import { DEPARTMENTS, ENDINGS, EPILOGUE, LUNCH } from "./office-content.js";
 import { PHASES, RELATION_NAMES, act, canSubmit, codingCost, currentMission, isCoding, isFriday, newRun, options, recordFor, recordPaste, submitSolution } from "./office.js";
 import { METRICS, RULESET, formatDate } from "./records-schema.js";
 import { initRecords, openRecords, syncRecord } from "./records.js";
+import { initDialogueSound, typeDialogue } from "./dialogue.js";
 
 const $ = (id) => document.getElementById(id);
 const RUN_KEY = "retro-office-run-v1";
@@ -14,9 +15,11 @@ let shownMission;
 let busy = false;
 let idle;
 let bossVersion = 0;
+let bossTyping;
 
 // --- 화면 전환 ---
 function show(id) {
+  bossTyping?.abort();
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   window.scrollTo(0, 0);
@@ -25,37 +28,42 @@ function show(id) {
 // --- 프롤로그: 스크립트 러너 ---
 const WHO_LABEL = { me: "나", ai: "AI 에이전트", boss: "김 책임" };
 
+function dialogueLine(parent, text, options) {
+  const spoken = document.createElement("span");
+  spoken.className = "visually-hidden";
+  spoken.textContent = text;
+  const visual = document.createElement("span");
+  visual.setAttribute("aria-hidden", "true");
+  const letters = document.createTextNode("");
+  visual.append(letters);
+  parent.append(spoken, visual);
+  return typeDialogue(letters, text, options);
+}
+
 function addChatTo(logId, text, who) {
-  const log = document.getElementById(logId);
+  const log = $(logId);
   const div = document.createElement("div");
   div.className = `bubble ${who === "me" ? "player" : who}`;
   const label = document.createElement("span");
   label.className = "who";
   label.textContent = WHO_LABEL[who] || who;
   div.appendChild(label);
-  div.appendChild(document.createTextNode(text));
   log.appendChild(div);
-  div.scrollIntoView({ behavior: "smooth", block: "end" });
+  return dialogueLine(div, text, { voice: who, onFrame: () => { log.scrollTop = log.scrollHeight; } });
 }
 
-function typeAgentLogs(lines, termId, done) {
-  const term = document.getElementById(termId);
-  let li = 0, ci = 0;
-  term.textContent += "\n";
-  function tick() {
-    if (li >= lines.length) { done(); return; }
-    const line = lines[li];
-    if (ci < line.length) {
-      term.textContent += line[ci++];
-      setTimeout(tick, 14);
-    } else {
-      term.textContent += "\n";
-      li++; ci = 0;
-      setTimeout(tick, 180);
-    }
-    term.scrollTop = term.scrollHeight;
+const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function typeAgentLogs(lines, termId, linePause) {
+  const term = $(termId);
+  for (const line of lines) {
+    const letters = document.createTextNode("");
+    term.append(letters, "\n");
+    await typeDialogue(letters, line, {
+      voice: "terminal", letterMs: 14, onFrame: () => { term.scrollTop = term.scrollHeight; },
+    });
+    await pause(linePause);
   }
-  tick();
 }
 
 function runScript(steps, logId, btnsId, onDone, opts = {}) {
@@ -63,7 +71,7 @@ function runScript(steps, logId, btnsId, onDone, opts = {}) {
   let meCount = 0;
   const box = document.getElementById(btnsId);
 
-  function next() {
+  async function next() {
     if (i >= steps.length) { onDone(); return; }
     const step = steps[i++];
     if (step.who === "me") {
@@ -71,24 +79,21 @@ function runScript(steps, logId, btnsId, onDone, opts = {}) {
       const b = document.createElement("button");
       b.className = "btn";
       b.textContent = step.text;
-      b.onclick = () => {
+      b.onclick = async () => {
         box.innerHTML = "";
-        addChatTo(logId, step.text, "me");
         meCount++;
         if (opts.onAnger) opts.onAnger(meCount);
-        setTimeout(next, 500);
+        await addChatTo(logId, step.text, "me");
+        setTimeout(next, 140);
       };
       box.appendChild(b);
-    } else if (step.logs && opts.termId) {
-      typeAgentLogs(step.logs, opts.termId, () => {
-        addChatTo(logId, step.text, step.who);
-        setTimeout(next, 400);
-      });
     } else {
-      setTimeout(() => {
-        addChatTo(logId, step.text, step.who);
-        next();
-      }, 900);
+      if (step.logs && opts.termId) {
+        $(opts.termId).append("\n");
+        await typeAgentLogs(step.logs, opts.termId, 140);
+      } else await pause(330);
+      await addChatTo(logId, step.text, step.who);
+      setTimeout(next, 170);
     }
   }
   next();
@@ -101,19 +106,11 @@ function escalateAnger(meCount) {
   screen.classList.add(`anger-${level}`);
 }
 
-function startTravel() {
+async function startTravel() {
   show("screen-travel");
-  const log = document.getElementById("travel-log");
-  log.textContent = "";
-  let i = 0;
-  const iv = setInterval(() => {
-    if (i >= TRAVEL_LINES.length) {
-      clearInterval(iv);
-      setTimeout(enter2006, 900);
-      return;
-    }
-    log.textContent += TRAVEL_LINES[i++] + "\n";
-  }, 750);
+  $("travel-log").replaceChildren();
+  await typeAgentLogs(TRAVEL_LINES, "travel-log", 300);
+  setTimeout(enter2006, 500);
 }
 
 function markIntroSeen() {
@@ -165,12 +162,16 @@ function replaceList(parent, values) {
 
 function bossSay(line, generated = false) {
   bossVersion++;
-  $("boss-line").textContent = line;
+  bossTyping?.abort();
+  bossTyping = new AbortController();
+  const target = $("boss-line");
+  target.replaceChildren();
+  dialogueLine(target, line, { voice: "boss", maxMs: 700, signal: bossTyping.signal });
   if (generated) {
     const tag = document.createElement("span");
     tag.className = "ai-tag";
     tag.textContent = "AI";
-    $("boss-line").appendChild(tag);
+    target.appendChild(tag);
   }
 }
 
@@ -565,4 +566,5 @@ $("btn-submit").onclick = () => handlePython(true);
 $("title-records").onclick = () => openRecords(lastRecord, title);
 $("ending-records").onclick = () => openRecords(lastRecord, () => showResult(lastRecord));
 initRecords(show, (message) => { $("ending-sync").textContent = message; });
+initDialogueSound($("dialogue-sound"));
 title();
