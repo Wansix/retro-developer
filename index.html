@@ -2,19 +2,15 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>옛날 개발자 v0.5.0 — 퇴근하고 싶다</title>
-<link rel="stylesheet" href="src/style.css?v=9">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+<title>옛날 개발자 v0.8.0 — 퇴근하고 싶다</title>
+<link rel="stylesheet" href="src/style.css?v=31">
 </head>
 <body>
-  <div class="sound-control" hidden>
-    <button id="dialogue-sound" class="btn" type="button" aria-label="대사 소리" aria-pressed="true">대사 소리 켜짐</button>
-  </div>
-
   <!-- 타이틀 -->
   <section id="screen-title" class="screen active">
     <div class="terminal">
-      <h1>《옛날 개발자》 <span class="game-version">v0.5.0</span></h1>
+      <h1>《옛날 개발자》 <span class="game-version">v0.8.0</span></h1>
       <p class="sub">코딩은 쉬운데 퇴근이 어려운 게임.</p>
       <p class="line">2026년, 어느 개발자의 퇴근 2분 전.</p>
       <button id="btn-start" class="btn">게임 시작</button>
@@ -26,15 +22,57 @@
   </section>
 
   <!-- 프롤로그 2026: AI와의 설전 -->
-  <section id="screen-intro" class="screen">
-    <div class="terminal chat">
-      <p class="line dim">2026년, 오후 5시 58분. AI 코딩 에이전트</p>
-      <div id="agent-term-wrap">
-        <div class="term-title">AI CODING AGENT — 작업 로그</div>
-        <pre id="agent-term"></pre>
+  <section id="screen-intro" class="screen" aria-labelledby="intro-title">
+    <div class="intro-workbench">
+      <section id="intro-preview" class="intro-preview" data-state="baseline" aria-labelledby="intro-preview-title">
+        <header class="intro-preview-toolbar">
+          <h2 id="intro-preview-title">미리보기</h2>
+          <code id="intro-preview-address">localhost:3000/login</code>
+        </header>
+        <div class="intro-preview-page">
+          <div class="intro-shop-nav">
+            <strong>밤마켓</strong>
+            <div class="intro-preview-cart" aria-live="polite">
+              <span id="intro-preview-cart">장바구니 2개</span>
+              <small id="intro-preview-cart-detail">쿠폰 5,000원 할인</small>
+            </div>
+          </div>
+          <p id="intro-preview-banner" class="intro-preview-banner" hidden>지금은 로그인할 수 없어요.</p>
+          <div id="intro-preview-login-card" class="intro-preview-login">
+            <h3>로그인</h3>
+            <div class="intro-preview-field">이메일 <span>demo@example.test</span></div>
+            <div class="intro-preview-field">비밀번호 <span>••••••••</span></div>
+            <button id="intro-preview-login" type="button">로그인</button>
+            <button id="intro-preview-account" type="button" hidden>내 계정</button>
+            <p id="intro-preview-error" role="status" hidden>이메일 또는 비밀번호를 확인해 주세요.</p>
+          </div>
+          <div id="intro-preview-account-card" class="intro-preview-login hidden">
+            <h3>내 계정</h3>
+            <p>demo@example.test</p>
+          </div>
+        </div>
+      </section>
+      <div class="intro-terminal">
+        <header class="intro-toolbar">
+          <div class="intro-identity">
+            <span id="intro-comdori" class="comdori-avatar" data-action="idle" aria-hidden="true"></span>
+            <div>
+              <h1 id="intro-title">컴돌이</h1>
+              <p>코딩 에이전트</p>
+            </div>
+          </div>
+          <time datetime="17:58">2026년 · 17:58</time>
+        </header>
+        <div class="intro-workspace">
+          <code>~/work/shop-web <span>main</span></code>
+          <p id="intro-status" role="status">내 차례</p>
+        </div>
+        <div id="intro-transcript" role="log" aria-label="터미널 작업 기록" tabindex="0"></div>
       </div>
-      <div id="chat-log"></div>
-      <div id="intro-buttons"></div>
+      <button id="intro-speak" type="button">
+        <span id="intro-speak-label">내가 말하기</span>
+        <strong id="intro-speak-text"></strong>
+      </button>
     </div>
   </section>
 
@@ -57,7 +95,7 @@
   <!-- 타이틀 카드 -->
   <section id="screen-titlecard" class="screen">
     <div class="titlecard">
-      <h1 class="bigtitle">옛날 개발자 <span class="game-version">v0.5.0</span></h1>
+      <h1 class="bigtitle">옛날 개발자 <span class="game-version">v0.8.0</span></h1>
       <p class="tagline">미래소프트™ 개발 3팀</p>
       <p class="tagline2">코딩은 쉬운데 퇴근이 어려운 게임.</p>
       <button id="btn-gotowork" class="btn primary">첫 출근하기</button>
@@ -66,34 +104,34 @@
 
   <section id="screen-office" class="screen">
     <header id="hud">
-      <div class="hud-item"><span class="hud-label">입사</span><span id="hud-date"></span></div>
-      <div class="hud-item"><span class="hud-label">마감</span><span id="hud-dday"></span></div>
-      <div class="hud-item gauge"><span class="hud-label">체력</span>
+      <div class="hud-item"><span class="hud-label"><span class="stat-icon" aria-hidden="true">▦</span>입사</span><strong id="hud-date"></strong></div>
+      <div class="hud-item"><span class="hud-label"><span class="stat-icon deadline-icon" aria-hidden="true">⚑</span>마감</span><strong id="hud-dday"></strong></div>
+      <div id="hud-time-item" class="hud-item hidden"><span class="hud-label"><span class="stat-icon time-icon" aria-hidden="true">◷</span>업무 시간</span><strong id="hud-time"></strong></div>
+      <div class="hud-item gauge"><span class="hud-label"><span class="stat-icon health-icon" aria-hidden="true">♥</span>체력</span>
         <div class="bar" aria-hidden="true"><div id="bar-hp" class="bar-fill hp"></div></div><span id="hud-hp" class="hud-val"></span>
       </div>
-      <div class="hud-item gauge"><span class="hud-label">기능</span>
+      <div id="hud-stress-item" class="hud-item hidden"><span class="hud-label"><span class="stat-icon score-icon" aria-hidden="true">≈</span>스트레스</span><strong id="hud-stress"></strong></div>
+      <div class="hud-item gauge"><span class="hud-label"><span class="stat-icon" aria-hidden="true">▰</span><span id="hud-progress-label">기능</span></span>
         <div class="bar" aria-hidden="true"><div id="bar-progress" class="bar-fill prog"></div></div><span id="hud-progress" class="hud-val"></span>
       </div>
-      <div class="hud-item"><span class="hud-label">추가 일감</span><span id="hud-scope"></span></div>
-      <div class="hud-item"><span class="hud-label">인사평가</span><span id="hud-score"></span></div>
-      <div id="scrum-trust" class="hud-item hidden"><span class="hud-label">보고 신뢰도</span><span id="hud-trust"></span></div>
+      <div class="hud-item"><span class="hud-label"><span class="stat-icon" aria-hidden="true">▤</span>추가 일감</span><strong id="hud-scope"></strong></div>
+      <div class="hud-item"><span class="hud-label"><span class="stat-icon score-icon" aria-hidden="true">★</span>인사평가</span><strong id="hud-score"></strong></div>
+      <div id="scrum-trust" class="hud-item hidden"><span class="hud-label"><span class="stat-icon trust-icon" aria-hidden="true">✓</span>보고 신뢰도</span><strong id="hud-trust"></strong></div>
+      <button id="mines-launch" class="act-btn hidden" type="button">▦ 지뢰찾기</button>
+      <button id="office-sidebar-toggle" class="act-btn hidden" type="button" popovertarget="office-sidebar">일정·관계</button>
       <button id="office-title" class="act-btn" type="button">타이틀</button>
     </header>
 
     <div id="office-main">
-      <aside id="left-col">
+      <section id="office-stage" aria-labelledby="scene-caption">
         <div id="office-scene">
-          <svg id="scene-svg" viewBox="0 0 320 120" shape-rendering="crispEdges" aria-label="미래소프트 사무실">
+          <svg id="scene-svg" viewBox="0 0 320 120" preserveAspectRatio="xMidYMid slice" shape-rendering="crispEdges" aria-hidden="true">
             <!-- 벽과 바닥 -->
             <rect x="0" y="0" width="320" height="80" fill="#9aa48a"/>
             <rect x="0" y="80" width="320" height="40" fill="#6a7258"/>
             <!-- 형광등 -->
             <rect x="60" y="4" width="60" height="6" fill="#e8f0d8"/>
             <rect x="200" y="4" width="60" height="6" fill="#e8f0d8"/>
-            <!-- 벽시계 -->
-            <rect x="150" y="14" width="16" height="16" fill="#e8e0c8"/>
-            <rect x="157" y="17" width="2" height="6" fill="#3a3423"/>
-            <rect x="157" y="21" width="5" height="2" fill="#3a3423"/>
             <!-- 박 대리 책상 (왼쪽) -->
             <rect x="8" y="70" width="60" height="6" fill="#8a7f5a"/>
             <rect x="12" y="76" width="4" height="14" fill="#6a5f3a"/>
@@ -101,11 +139,7 @@
             <rect x="28" y="56" width="20" height="14" fill="#3a4a3a"/>
             <rect x="31" y="59" width="14" height="8" fill="#6fc040"/>
             <!-- 박 대리 -->
-            <g id="spr-park">
-              <rect x="46" y="46" width="10" height="10" fill="#e0b890"/>
-              <rect x="46" y="44" width="10" height="4" fill="#3a3423"/>
-              <rect x="45" y="56" width="12" height="14" fill="#7a6a4a"/>
-            </g>
+            <image id="desk-park" href="src/assets/cast/park-portrait.png" x="38" y="40" width="26" height="29.25"/>
             <!-- 이 대리 책상 -->
             <rect x="90" y="70" width="60" height="6" fill="#8a7f5a"/>
             <rect x="94" y="76" width="4" height="14" fill="#6a5f3a"/>
@@ -113,11 +147,7 @@
             <rect x="110" y="56" width="20" height="14" fill="#3a4a3a"/>
             <rect x="113" y="59" width="14" height="8" fill="#6fc040"/>
             <!-- 이 대리 -->
-            <g id="spr-lee">
-              <rect x="128" y="46" width="10" height="10" fill="#e0b890"/>
-              <rect x="128" y="44" width="10" height="4" fill="#1a1a1a"/>
-              <rect x="127" y="56" width="12" height="14" fill="#4a5a7a"/>
-            </g>
+            <image id="desk-lee" href="src/assets/cast/lee-portrait.png" x="118" y="40" width="26" height="29.25"/>
             <!-- 주인공 책상 -->
             <rect x="180" y="70" width="70" height="6" fill="#8a7f5a"/>
             <rect x="184" y="76" width="4" height="14" fill="#6a5f3a"/>
@@ -132,74 +162,208 @@
               <rect x="226" y="42" width="10" height="4" fill="#2a2a1a"/>
               <rect x="225" y="54" width="12" height="16" fill="#5a6a3a"/>
             </g>
-            <!-- 김 과장 (주인공 뒤) -->
-            <image id="spr-boss" href="src/assets/kim-manager.svg" x="256" y="32" width="32" height="36"/>
           </svg>
+          <span id="boss-face" class="kim-avatar" aria-hidden="true"></span>
+          <img id="coworker-face" class="hidden" width="240" height="270" alt="">
           <div id="scene-caption">미래소프트™ 개발 3팀</div>
+          <div class="office-clock-dial">
+            <button id="office-clock" type="button" aria-label="사무실 시계로 현재 시간 확인">
+              <span class="clock-icon" aria-hidden="true">◷</span>
+            </button>
+            <time id="office-clock-time" role="status"></time>
+          </div>
         </div>
-        <div id="boss-dialog" aria-live="polite">
-          <div id="boss-face"><img src="src/assets/kim-manager.svg" alt=""></div>
-          <div id="boss-text"><span class="speaker">김 과장</span><p id="boss-line"></p></div>
+        <div id="boss-dialog">
+          <div aria-live="polite" aria-atomic="true">
+            <span id="office-speaker" class="speaker">김 과장</span>
+            <p id="boss-line"></p>
+          </div>
+          <button id="office-dialogue-next" class="act-btn hidden" type="button">다음 대사 →</button>
         </div>
-        <details id="relation-panel">
-          <summary>팀원과 부서 관계</summary>
-          <p>사원 → 대리 → 과장 → 차장 → 부장</p>
-          <dl id="relations"></dl>
-        </details>
-        <ol id="schedule" aria-label="오늘 일정"></ol>
-      </aside>
+      </section>
 
       <main id="work-panel">
-        <section id="shift-panel" aria-labelledby="shift-title">
-          <p id="shift-clock" class="phase-clock"></p>
-          <h1 id="shift-title" tabindex="-1"></h1>
-          <p id="shift-story"></p>
-          <ul id="shift-effects" aria-live="polite"></ul>
+        <div class="office-briefing">
+          <section id="shift-panel" aria-labelledby="shift-title">
+            <p id="shift-clock" class="phase-clock"></p>
+            <h1 id="shift-title" tabindex="-1"></h1>
+            <p id="shift-story"></p>
+            <ul id="shift-effects" aria-live="polite"></ul>
+          </section>
+          <section id="scrum-panel" class="hidden" aria-labelledby="scrum-yesterday-title">
+            <h2 id="scrum-yesterday-title">어제 실제로 한 일</h2>
+            <p id="scrum-yesterday"></p>
+            <dl id="scrum-totals"></dl>
+            <p id="scrum-previous"></p>
+            <p id="scrum-today"></p>
+            <details id="scrum-history">
+              <summary>오전 배포 약속 기록</summary>
+              <ul id="scrum-promises"></ul>
+            </details>
+          </section>
+        </div>
+        <form id="name-form" class="hidden">
+          <label for="player-name">이름</label>
+          <input id="player-name" type="text" maxlength="20" required autocomplete="off" placeholder="이름을 입력해 주세요">
+          <button class="act-btn" type="submit">첫 업무 시작</button>
+        </form>
+        <section id="work-challenge" class="hidden" aria-labelledby="challenge-title">
+          <header>
+            <span id="challenge-type"></span>
+            <h2 id="challenge-title" tabindex="-1"></h2>
+            <p id="challenge-brief"></p>
+          </header>
+          <div id="challenge-board"></div>
+          <footer class="challenge-footer">
+            <div class="actions">
+              <button id="challenge-submit" class="btn primary" type="button">업무 제출</button>
+              <button id="challenge-help-open" class="btn" type="button">힌트</button>
+              <button id="challenge-next" class="btn hidden" type="button"></button>
+            </div>
+            <div class="challenge-messages">
+              <p id="challenge-status" role="status"></p>
+              <p id="challenge-feedback" role="status"></p>
+            </div>
+          </footer>
         </section>
-        <section id="scrum-panel" class="hidden" aria-labelledby="scrum-yesterday-title">
-          <h2 id="scrum-yesterday-title">어제 실제로 한 일</h2>
-          <p id="scrum-yesterday"></p>
-          <dl id="scrum-totals"></dl>
-          <p id="scrum-previous"></p>
-          <p id="scrum-today"></p>
-          <details id="scrum-history">
-            <summary>오전 배포 약속 기록</summary>
-            <ul id="scrum-promises"></ul>
-          </details>
-        </section>
-        <div id="choices"></div>
         <section id="coding-panel" class="hidden" aria-labelledby="mission-title">
           <div id="mission-panel">
-            <h2 id="mission-title"></h2>
-            <p id="mission-brief"></p>
+            <div class="mission-heading">
+              <h2 id="mission-title" tabindex="-1"></h2>
+              <button id="mission-help-open" class="act-btn" type="button">문법과 예시</button>
+            </div>
             <p id="mission-req" class="req"></p>
-            <details id="mission-help">
-              <summary>문법과 예시</summary>
-              <p id="mission-grammar" class="grammar"></p>
-              <pre id="mission-example" class="example"></pre>
-              <pre id="mission-example-out" class="example out"></pre>
-              <p id="hint-box" class="hint"></p>
-            </details>
             <p class="expect">기대 결과 <code id="mission-expected"></code></p>
           </div>
-          <div class="editor-head">
-            <label for="editor">main.py</label>
-            <span id="paste-warning" class="warn" role="status"></span>
+          <div class="coding-terminal">
+            <div class="editor-head">
+              <label for="editor">main.py</label>
+              <span id="paste-warning" class="warn" role="status"></span>
+              <button id="internet-toggle" class="act-btn" type="button" aria-expanded="false" aria-controls="desk-internet">인터넷 검색</button>
+            </div>
+            <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+            <div class="actions">
+              <button id="btn-run" class="btn">실행</button>
+              <button id="btn-submit" class="btn primary" aria-describedby="submit-status">업무 제출</button>
+            </div>
+            <div id="submit-help" class="submit-help hidden">
+              <p id="submit-status" role="status"></p>
+              <button id="submit-next" class="btn hidden" type="button"></button>
+            </div>
+            <div class="editor-head"><span>실행 결과</span></div>
+            <pre id="output" role="status" tabindex="0"></pre>
           </div>
-          <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-          <div class="actions">
-            <button id="btn-run" class="btn">실행</button>
-            <button id="btn-submit" class="btn primary" aria-describedby="submit-status">업무 제출</button>
-          </div>
-          <div id="submit-help" class="submit-help hidden">
-            <p id="submit-status" role="status"></p>
-            <button id="submit-next" class="btn hidden" type="button"></button>
-          </div>
-          <div class="editor-head"><span>실행 결과</span></div>
-          <pre id="output" role="status"></pre>
+          <section id="desk-internet" class="hidden" aria-labelledby="internet-title">
+            <header class="internet-caption">
+              <h2 id="internet-title">▣ 미래넷 브라우저</h2>
+              <button id="internet-close" type="button" aria-label="인터넷 브라우저 닫기">×</button>
+            </header>
+            <nav class="internet-toolbar" aria-label="브라우저 메뉴">
+              <button id="internet-back" type="button">← 뒤로</button>
+              <button id="internet-home" type="button">처음</button>
+              <button id="internet-history" type="button">기록</button>
+            </nav>
+            <form id="internet-search">
+              <label for="internet-query">검색</label>
+              <input id="internet-query" type="search" maxlength="96" placeholder="함수, TypeError…" required autocomplete="off" spellcheck="false">
+              <button type="submit">검색</button>
+            </form>
+            <p id="internet-location" aria-label="브라우저 위치"></p>
+            <div id="internet-view" tabindex="0" aria-live="polite"></div>
+          </section>
         </section>
+        <div id="choices"></div>
       </main>
+      <aside id="office-aside">
+        <section id="compdori-panel" aria-labelledby="compdori-name">
+          <span id="compdori-face" class="comdori-avatar" data-action="idle" aria-hidden="true"></span>
+          <div class="compdori-copy">
+            <h2 id="compdori-name">컴돌이</h2>
+            <p id="compdori-text" aria-live="polite" aria-atomic="true"></p>
+          </div>
+        </section>
+        <div id="office-sidebar">
+          <ol id="schedule" aria-label="오늘 일정"></ol>
+          <section id="relation-panel" aria-labelledby="relation-title">
+            <h2 id="relation-title">팀원과 부서 관계</h2>
+            <p>사원 → 대리 → 과장 → 차장 → 부장</p>
+            <dl id="relations"></dl>
+          </section>
+        </div>
+      </aside>
     </div>
+    <dialog id="mission-help" class="work-note" aria-labelledby="mission-help-title">
+      <h2 id="mission-help-title">문법과 예시</h2>
+      <p id="mission-brief"></p>
+      <p id="mission-bank-meta" class="hidden"></p>
+      <p id="mission-grammar" class="grammar"></p>
+      <pre id="mission-example" class="example"></pre>
+      <pre id="mission-example-out" class="example out"></pre>
+      <section id="mission-public-tests" class="hidden" aria-labelledby="mission-public-title">
+        <h3 id="mission-public-title">공개 테스트</h3>
+        <ul id="mission-public-cases"></ul>
+      </section>
+      <p id="hint-box" class="hint"></p>
+      <div id="mission-support" class="hidden">
+        <button id="mission-review-code" class="btn hidden" type="button">이 대리에게 검토받기</button>
+        <pre id="mission-solution" class="example hidden" aria-label="이 대리의 풀이 예시"></pre>
+        <details id="mission-delegation-options">
+          <summary>업무를 이 대리에게 넘기기</summary>
+          <p id="mission-delegation-cost"></p>
+          <button id="mission-delegate" class="btn" type="button">이 대리에게 넘기기</button>
+        </details>
+      </div>
+      <form method="dialog"><button class="btn">편집기로 돌아가기</button></form>
+    </dialog>
+    <dialog id="challenge-help" class="work-note" aria-labelledby="challenge-help-title">
+      <h2 id="challenge-help-title">이 대리의 힌트</h2>
+      <p id="challenge-hint"></p>
+      <form method="dialog"><button class="btn">업무로 돌아가기</button></form>
+    </dialog>
+    <dialog id="office-guide" aria-labelledby="office-guide-title">
+      <div class="office-guide-head">
+        <span id="guide-comdori" class="comdori-avatar" aria-hidden="true"></span>
+        <div>
+          <h2 id="office-guide-title">컴돌이</h2>
+          <p id="office-guide-line"></p>
+        </div>
+      </div>
+      <dl>
+        <dt><span class="stat-icon health-icon" aria-hidden="true">♥</span>체력</dt>
+        <dd>야근하면 줄고, 쉬거나 정시 퇴근하면 회복돼요. 0이면 게임이 끝나요.</dd>
+        <dt id="guide-stress-label"><span class="stat-icon score-icon" aria-hidden="true">≈</span>스트레스</dt>
+        <dd id="guide-stress-copy">75 이상이면 제출에 10분이 더 걸려요. 지뢰찾기는 업무 시간을 써서 스트레스를 낮춰요.</dd>
+        <dt><span class="stat-icon time-icon" aria-hidden="true">◷</span>업무 시간</dt>
+        <dd>제출과 회의에 시간이 들어요. 지금 시각은 사무실 시계에서 봐요.</dd>
+        <dt><span class="stat-icon trust-icon" aria-hidden="true">✓</span>보고 신뢰도</dt>
+        <dd>스크럼에서 솔직히 보고하고 약속을 지키면 올라가요.</dd>
+        <dt><span class="stat-icon score-icon" aria-hidden="true">★</span>인사평가</dt>
+        <dd>업무 성과와 선택에 따라 바뀌고, 엔딩에도 영향을 줘요.</dd>
+        <dt><span class="stat-icon deadline-icon" aria-hidden="true">⚑</span>마감</dt>
+        <dd id="guide-deadline-copy"></dd>
+      </dl>
+      <form method="dialog"><button class="btn primary" autofocus>첫 업무로 가기</button></form>
+    </dialog>
+    <dialog id="mines-window" aria-labelledby="mines-title">
+      <header class="mines-titlebar">
+        <h2 id="mines-title">▧ 지뢰찾기</h2>
+        <button id="mines-minimize" type="button" aria-label="지뢰찾기 최소화">_</button>
+        <button id="mines-close" type="button" aria-label="지뢰찾기 닫기">×</button>
+      </header>
+      <div class="mines-body">
+        <p id="mines-warning" role="alert"></p>
+        <div class="mines-toolbar">
+          <span id="mines-count" aria-label="남은 깃발"></span>
+          <button id="mines-reset" type="button">새 판</button>
+          <span id="mines-seconds" aria-label="이번 판 플레이 시간"></span>
+        </div>
+        <div id="mines-board" role="group" aria-label="5×5 지뢰찾기"></div>
+        <button id="mines-flag" type="button" aria-pressed="false">⚑ 깃발 모드</button>
+        <p id="mines-status" role="status"></p>
+        <p id="mines-budget"></p>
+        <p id="mines-best"></p>
+      </div>
+    </dialog>
   </section>
 
   <section id="screen-twist" class="screen">
@@ -250,6 +414,6 @@
       <button id="records-back" class="btn">돌아가기</button>
     </div>
   </section>
-  <script type="module" src="src/main.js?v=10"></script>
+  <script type="module" src="src/main.js?v=33"></script>
 </body>
 </html>

@@ -1,3 +1,5 @@
+import { CHAINED_WORK_RULESET, DIRECT_ASSIGNMENT_RULESET, WORK_CONTENT_RULESET, formatMinutes } from "./records-schema.js";
+
 const EVENTS = [
   { id: "short", text: "김 과장 ‘오늘은 짧게 합시다.’ 박 대리가 실적표 세 장을 꺼내고, 이 대리는 막힌 일을 솔직히 말하다가 검수를 하나 더 맡았다.", minutes: 15 },
   { id: "question", text: "김 과장 ‘그게 왜 막혔는데? 칠판에 한번 그려봐.’", minutes: 40 },
@@ -40,6 +42,7 @@ function resolvePromise(s) {
 
 function scrumEvent(s) {
   if (s.scrum.previousPromise?.result === "미이행") return CAUGHT;
+  if (s.ruleset >= DIRECT_ASSIGNMENT_RULESET && s.shift <= 2) return null;
   if (s.shift === 1) return EVENTS[0];
   // Keep the event rotation independent of the existing office and ticket draws.
   if ((s.shift + (s.seed >>> 16)) % 5 > 1) return null;
@@ -51,6 +54,7 @@ export function beginScrumDay(s, missionName) {
   s.scrum.event = scrumEvent(s);
   s.scrum.assignment = null;
   s.scrum.today = { mission: missionName, codingAtStart: s.stats.coding, planning: 0, research: 0, bugs: 0 };
+  if (s.ruleset >= WORK_CONTENT_RULESET) Object.assign(s.scrum.today, { workAttempts: 0, workMinutes: 0, workType: null });
 }
 
 export function finishScrumDay(s) {
@@ -62,6 +66,15 @@ export function finishScrumDay(s) {
     research: s.scrum.today.research,
     bugs: s.scrum.today.bugs,
   };
+  if (s.ruleset >= WORK_CONTENT_RULESET) {
+    const { workAttempts, workMinutes, workType } = s.scrum.today;
+    Object.assign(s.scrum.yesterday, { workAttempts, workMinutes, workType });
+    if (s.scrum.today.workDelegated) s.scrum.yesterday.workDelegated = true;
+  }
+  if (s.ruleset >= CHAINED_WORK_RULESET) {
+    s.scrum.yesterday.workCount = s.workDoneToday;
+    s.scrum.yesterday.completed = s.workDoneToday > 0;
+  }
 }
 
 export function markMorningDelivery(s) {
@@ -114,12 +127,13 @@ export function handleScrum(s, id, missionName) {
   s.scrum.history.push(report);
   s.stats.scrums++;
   s.stats.scrumMinutes += report.minutes;
-  return { effect: { ...effect, meeting: report.minutes }, effects: [`스크럼과 후속 회의 ${report.minutes}분 · 보고 신뢰도 ${s.stats.reportTrust}/100`, ...effects] };
+  return { effect: { ...effect, meeting: report.minutes }, effects: [`스크럼과 후속 회의 ${formatMinutes(report.minutes)} · 보고 신뢰도 ${s.stats.reportTrust}/100`, ...effects] };
 }
 
 export function finishScrumRun(s, calendarLimitReached) {
   resolvePromise(s);
-  if (calendarLimitReached && s.stats.scrums === s.shift) {
+  const scheduledScrums = s.shift - (s.ruleset >= DIRECT_ASSIGNMENT_RULESET ? 1 : 0);
+  if (calendarLimitReached && s.stats.scrums === scheduledScrums) {
     s.achievements.push("스크럼 마스터");
   }
 }

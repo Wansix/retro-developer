@@ -4,7 +4,8 @@
 //   HERMES_URL  — 예: https://hermes.example.com (cojafa는 로컬 터널 127.0.0.1:18643 사용)
 //   HERMES_KEY  — Bearer 키
 //   HERMES_MODEL — 선택, 기본 cojafa-judgment
-// 미설정·오류·시간 초과 시 503을 반환하고 클라이언트는 고정 대사를 유지한다.
+// 로컬 미리보기는 Hermes 설정이 없으면 운영의 공개 대사 API를 사용한다.
+// 호출 실패 시 클라이언트는 고정 대사를 유지한다.
 // 이 함수는 대사 텍스트만 생성한다. 점수·판정 등 게임 로직에는 관여하지 않는다.
 
 const PERSONA = `당신은 2006년 한국 중소 IT 회사의 개발팀 과장 "김 과장"입니다.
@@ -20,15 +21,48 @@ const SITUATIONS = {
   leave: "신입이 정시 퇴근을 선언했다.",
 };
 
-export async function onRequestPost({ request, env }) {
-  if (!env.HERMES_URL || !env.HERMES_KEY) {
+async function previewBossLine(request, body) {
+  const { hostname, origin } = new URL(request.url);
+  if (!["127.0.0.1", "localhost", "[::1]"].includes(hostname)) {
     return new Response("LLM disabled", { status: 503 });
   }
+  const requestOrigin = request.headers.get("Origin");
+  if (requestOrigin && requestOrigin !== origin) {
+    return new Response("forbidden", { status: 403 });
+  }
+
+  const { kind, day, hp, overtime } = body;
+  try {
+    const response = await fetch("https://retro-developer.pages.dev/api/boss-line", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: Object.hasOwn(SITUATIONS, kind) ? kind : "idle",
+        day: Number.isInteger(day) ? day : 1,
+        hp: Number.isFinite(hp) ? hp : 100,
+        overtime: Number.isInteger(overtime) ? overtime : 0,
+      }),
+      signal: AbortSignal.timeout(9000),
+    });
+    if (response.ok) return Response.json(await response.json());
+  } catch {
+    // Let the client keep the scripted dialogue if the preview call fails.
+  }
+  return new Response("llm error", { status: 503 });
+}
+
+export async function onRequestPost({ request, env }) {
   let body;
   try {
     body = await request.json();
   } catch {
     return new Response("bad request", { status: 400 });
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return new Response("bad request", { status: 400 });
+  }
+  if (!env.HERMES_URL || !env.HERMES_KEY) {
+    return previewBossLine(request, body);
   }
 
   const situation = SITUATIONS[body.kind] || SITUATIONS.idle;

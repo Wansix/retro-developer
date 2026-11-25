@@ -1,5 +1,6 @@
 import { ENDINGS } from "./office-content.js";
-import { CATEGORIES, METRICS, formatDate } from "./records-schema.js";
+import { CATEGORIES, METRICS, formatDate, formatMinutes } from "./records-schema.js";
+import { workResultRows } from "./work-missions.js";
 
 const $ = (id) => document.getElementById(id);
 const LAST_KEY = "retro-office-last-record-v1";
@@ -89,7 +90,15 @@ function recordDetails(record) {
     const term = document.createElement("dt");
     const value = document.createElement("dd");
     term.textContent = name;
-    value.textContent = key === "completedDay" ? record[key] ? formatDate(record[key]) : "미완료" : `${record[key]}${unit}`;
+    value.textContent = key === "completedDay" ? record[key] ? formatDate(record.completedCalendarDay ?? record[key]) : "미완료"
+      : unit === "분" ? formatMinutes(record[key]) : `${record[key]}${unit}`;
+    stats.append(term, value);
+  }
+  for (const [name, rate] of workResultRows(record)) {
+    const term = document.createElement("dt");
+    const value = document.createElement("dd");
+    term.textContent = name;
+    value.textContent = rate;
     stats.append(term, value);
   }
   detail.append(title, stats);

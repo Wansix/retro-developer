@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { replayRun } from "../../src/office.js";
-import { CATEGORIES, FIRST_RULESET, RULESET } from "../../src/records-schema.js";
+import { CATEGORIES, FIRST_RULESET, RULESET, WORK_CONTENT_RULESET } from "../../src/records-schema.js";
 
 const COOKIE = "retro_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 14;
@@ -95,7 +95,7 @@ async function authenticate(context, action, body) {
 
 async function saveRun(db, account, body) {
   if (!integer(body?.ruleset, FIRST_RULESET, RULESET) || typeof body.id !== "string" || !UUID.test(body.id) || !integer(body.seed, 0, 0xffffffff) ||
-    !Array.isArray(body.moves) || !integer(body.moves.length, 1, 500)) return problem("결산 기록이 올바르지 않습니다.", 400);
+    !Array.isArray(body.moves) || !integer(body.moves.length, 1, body.ruleset >= WORK_CONTENT_RULESET ? 8192 : 500)) return problem("결산 기록이 올바르지 않습니다.", 400);
   const summary = replayRun({ id: body.id.toLowerCase(), seed: body.seed, moves: body.moves, ruleset: body.ruleset });
   if (!summary) return problem("결산 기록이 올바르지 않습니다.", 400);
   const result = await db.prepare("INSERT INTO runs VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING")
@@ -121,7 +121,7 @@ async function leaderboard(db, category) {
   return json({ entries: results });
 }
 
-async function readBody(request) {
+async function readBody(request, maxBytes = 8192) {
   if (request.headers.get("Content-Type")?.split(";")[0] !== "application/json") throw new Error("Expected JSON");
   const reader = request.body?.getReader();
   const decoder = new TextDecoder();
@@ -132,7 +132,7 @@ async function readBody(request) {
       const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
-      if (total > 8192) {
+      if (total > maxBytes) {
         await reader.cancel();
         throw new Error("Body too large");
       }
@@ -169,14 +169,16 @@ export async function onRequest({ request, env, waitUntil }) {
       if (token) await db.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(token).run();
       return json({ handle: null }, 200, { "Set-Cookie": sessionCookie(request, "", 0) });
     }
-    let body;
-    try { body = await readBody(request); } catch { return problem("요청 내용을 읽을 수 없습니다.", 400); }
-    if (action === "login" || action === "register") return await authenticate({ db, request, waitUntil }, action, body);
     if (action === "save") {
       const account = await accountFrom(db, token);
       if (!account) return problem("로그인이 필요합니다.", 401);
+      let body;
+      try { body = await readBody(request, 192 * 1024); } catch { return problem("요청 내용을 읽을 수 없습니다.", 400); }
       return await saveRun(db, account, body);
     }
+    let body;
+    try { body = await readBody(request); } catch { return problem("요청 내용을 읽을 수 없습니다.", 400); }
+    if (action === "login" || action === "register") return await authenticate({ db, request, waitUntil }, action, body);
     return problem("기록실 메뉴를 찾지 못했습니다.", 404);
   } catch (error) {
     console.error("Records service error", error);

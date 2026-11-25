@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ENDINGS, OFFICE_EVENTS } from "../src/office-content.js";
 import { MISSIONS } from "../src/missions.js";
-import { act, canSubmit, isFriday, newRun, options, recordFor, recordPaste, replayRun, submitSolution } from "../src/office.js";
-import { FIRST_RULESET, RULESET } from "../src/records-schema.js";
+import { act, canSubmit, codingCost, currentMission, isFriday, newRun, options, recordFor, recordPaste, replayRun, submitSolution } from "../src/office.js";
+import { DIRECT_ASSIGNMENT_RULESET, FIRST_RULESET, SCRUM_RULESET } from "../src/records-schema.js";
 
-function play(style, seed = 417, ruleset = RULESET) {
+function play(style, seed = 417, ruleset = SCRUM_RULESET) {
   const run = newRun(seed, undefined, ruleset);
   for (let turn = 0; turn < 400 && !run.ending; turn++) {
     const choices = {
@@ -20,6 +20,7 @@ function play(style, seed = 417, ruleset = RULESET) {
         : style === "promotion" ? "reportFull" : "reportBrief",
       leave: "leave",
     };
+    if (ruleset === DIRECT_ASSIGNMENT_RULESET) assert.ok(options(run).length <= 4);
     if ((style === "promotion" && run.shift % 2 === 0 && run.shift <= 8) ||
       (["teamwork", "release"].includes(style) && run.shift % 3 === 0 && run.shift <= 9) ||
       style === "hospital") choices.leave = "stay";
@@ -79,7 +80,7 @@ test("waiting twice exposes two jobs and relations unlock a trade on later days"
 });
 
 test("replay rejects incomplete games and impossible actions and reproduces paste streaks", () => {
-  const run = newRun(778);
+  const run = newRun(778, undefined, SCRUM_RULESET);
   assert.equal(recordPaste(run), 0);
   assert.equal(replayRun({ ...run, moves: ["solve"] }), null);
   assert.equal(replayRun({ ...run, moves: ["arrive", "trade"] }), null);
@@ -104,8 +105,8 @@ function step(run, moves) {
 }
 
 test("the report and the separate assignment consume the actual morning budget", () => {
-  const honest = newRun(417);
-  const blame = newRun(417);
+  const honest = newRun(417, undefined, SCRUM_RULESET);
+  const blame = newRun(417, undefined, SCRUM_RULESET);
   step(honest, ["arrive"]);
   assert.equal(honest.phase, "scrum");
   assert.equal(options(honest).length, 4);
@@ -123,7 +124,7 @@ test("the report and the separate assignment consume the actual morning budget",
 
 test("an actual morning delivery fulfills a promise; an afternoon delivery still misses it", () => {
   for (const morningDelivery of [true, false]) {
-    const run = newRun(417);
+    const run = newRun(417, undefined, SCRUM_RULESET);
     step(run, ["arrive", "scrumPromise", "refuse"]);
     if (morningDelivery) assert.ok(submitSolution(run));
     step(run, ["next", "park", "document"]);
@@ -149,5 +150,35 @@ test("an actual morning delivery fulfills a promise; an afternoon delivery still
       step(run, ["scrumPromise"]);
       assert.equal(run.stats.reportTrust, 56);
     }
+  }
+});
+
+test("the tutorial teaches one mission before the first scrum and later tasks are assigned directly", () => {
+  const run = newRun(417, undefined, DIRECT_ASSIGNMENT_RULESET);
+  assert.deepEqual(options(run).map(({ id }) => id), ["arrive"]);
+  step(run, ["arrive"]);
+  assert.equal(run.phase, "morning");
+  assert.equal(run.stats.scrums, 0);
+  assert.equal(currentMission(run), MISSIONS[0]);
+  assert.ok(canSubmit(run));
+  step(run, ["tutorialHelp"]);
+  assert.equal(run.hint, true);
+  assert.equal(act(run, "tutorialHelp"), false);
+  assert.ok(submitSolution(run));
+  assert.equal(run.scope, 0);
+  step(run, ["next"]);
+  assert.equal(run.phase, "leave");
+  step(run, ["leave", "arrive"]);
+  assert.equal(run.scrum.yesterday.mission, MISSIONS[0].title);
+  assert.equal(run.scrum.yesterday.completed, true);
+  assert.deepEqual(options(run).map(({ id }) => id), ["scrumQuick"]);
+  step(run, ["scrumQuick"]);
+  assert.equal(run.phase, "morning");
+  assert.equal(currentMission(run), MISSIONS[1]);
+  assert.equal(codingCost(run), 45);
+  for (const ending of ["balance", "deadline"]) {
+    const completed = play(ending, 417, DIRECT_ASSIGNMENT_RULESET);
+    assert.equal(completed.ending, ending);
+    assert.deepEqual(replayRun(completed), recordFor(completed));
   }
 });

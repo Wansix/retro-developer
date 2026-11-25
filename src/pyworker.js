@@ -5,7 +5,7 @@ const OUTPUT_LIMIT = 4000;
 async function init() {
   const py = await loadPyodide();
   postMessage({ type: "ready" });
-  self.onmessage = async ({ data: { code, jobId, check } }) => {
+  self.onmessage = async ({ data: { code, jobId, check, verify } }) => {
     let stdout = "";
     const append = (line) => {
       if (stdout.length < OUTPUT_LIMIT) stdout += (line + "\n").slice(0, OUTPUT_LIMIT + 1 - stdout.length);
@@ -15,14 +15,77 @@ async function init() {
     const namespace = py.toPy(new Map());
     try {
       await py.runPythonAsync(code, { globals: namespace });
-      const passed = check ? await grade(py, namespace, code, check, stdout) : undefined;
-      postMessage({ type: "result", jobId, ok: true, stdout, passed });
+      if (check?.type === "bank-function") {
+        const tests = await gradeBank(py, code, check, verify);
+        postMessage({ type: "result", jobId, ok: true, stdout, ...tests });
+      } else {
+        const passed = check ? await grade(py, namespace, code, check, stdout) : undefined;
+        postMessage({ type: "result", jobId, ok: true, stdout, passed });
+      }
     } catch (error) {
       postMessage({ type: "result", jobId, ok: false, stdout, error: String(error).slice(0, OUTPUT_LIMIT) });
     } finally {
       namespace.destroy();
     }
   };
+}
+
+const BANK_CHECK = `
+import json
+
+def same_value(actual, expected):
+    if isinstance(expected, bool):
+        return type(actual) is bool and actual == expected
+    if isinstance(expected, (int, float)):
+        return type(actual) in (int, float) and actual == expected
+    if isinstance(expected, list):
+        return isinstance(actual, (list, tuple)) and len(actual) == len(expected) and all(
+            same_value(a, e) for a, e in zip(actual, expected)
+        )
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and actual.keys() == expected.keys() and all(
+            same_value(actual[key], expected[key]) for key in expected
+        )
+    return type(actual) is type(expected) and actual == expected
+
+def check_case(submission, name, raw_args, raw_expected, preserve_args):
+    args = json.loads(raw_args)
+    result = submission[name](*args)
+    return same_value(result, json.loads(raw_expected)) and (
+        not preserve_args or same_value(args, json.loads(raw_args))
+    )
+
+check_case
+`;
+
+async function gradeBank(py, code, check, verify) {
+  const tools = py.toPy(new Map());
+  const judge = py.runPython(BANK_CHECK, { globals: tools });
+  py.setStdout({ batched: () => {} });
+  py.setStderr({ batched: () => {} });
+
+  async function count(cases) {
+    let passed = 0;
+    for (const test of cases) {
+      const isolated = py.toPy(new Map());
+      try {
+        await py.runPythonAsync(code, { globals: isolated });
+        if (judge(isolated, check.name, JSON.stringify(test.args), JSON.stringify(test.expected), !!check.preserveArgs)) passed++;
+      } catch { /* A case can fail without exposing its arguments or traceback. */ }
+      finally { isolated.destroy(); }
+    }
+    return passed;
+  }
+  try {
+    const publicPassed = await count(check.public);
+    const hiddenTotal = verify ? check.hidden.length : 0;
+    const hiddenPassed = verify ? await count(check.hidden) : 0;
+    const publicTotal = check.public.length;
+    return { publicPassed, publicTotal, hiddenPassed, hiddenTotal, passed: publicPassed === publicTotal && hiddenPassed === hiddenTotal };
+  } finally {
+    judge.destroy();
+    tools.destroy();
+  }
 }
 
 const normalize = (text) => text.replace(/\r\n/g, "\n").trim();

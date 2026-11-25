@@ -2,7 +2,10 @@ const SOUND_KEY = "retro-dialogue-sound";
 const AudioEngine = window.AudioContext ?? window.webkitAudioContext;
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const WAIT = 52;
-const PITCH = { me: 385, ai: 510, boss: 290, terminal: 455 };
+const PITCH = {
+  me: 385, ai: 510, boss: 290, terminal: 455,
+  jung: 235, park: 360, lee: 320, planning: 415, design: 475, sales: 335, qa: 270,
+};
 const NOTES = [1, 1.11, 1.04, 0.94];
 
 let enabled = true;
@@ -10,21 +13,9 @@ let context;
 let volume;
 let lastTick = -Infinity;
 
-export function initDialogueSound(button) {
+export function initDialogueSound() {
   if (!AudioEngine) return;
   try { enabled = localStorage.getItem(SOUND_KEY) !== "off"; } catch { /* Use the default. */ }
-
-  function update() {
-    button.textContent = `대사 소리 ${enabled ? "켜짐" : "꺼짐"}`;
-    button.setAttribute("aria-pressed", String(enabled));
-    if (volume) volume.gain.value = enabled ? 1 : 0;
-  }
-
-  button.addEventListener("click", () => {
-    enabled = !enabled;
-    try { localStorage.setItem(SOUND_KEY, enabled ? "on" : "off"); } catch { /* Keep the setting for this page. */ }
-    update();
-  });
 
   // A trusted click also unlocks audio when the user skips the prologue or resumes a save.
   document.addEventListener("click", (event) => {
@@ -38,8 +29,6 @@ export function initDialogueSound(button) {
       context.resume().catch(() => {});
     } catch { /* Dialogue remains readable without audio. */ }
   });
-  button.parentElement.hidden = false;
-  update();
 }
 
 function blip(voice, index) {
@@ -62,6 +51,26 @@ function blip(voice, index) {
   oscillator.stop(now + .045);
 }
 
+export function playFootsteps() {
+  if (!enabled || context?.state !== "running" || document.hidden) return;
+  const now = context.currentTime;
+  [0, .18, .38].forEach((delay, index) => {
+    const start = now + delay;
+    const step = context.createOscillator();
+    const envelope = context.createGain();
+    step.type = "triangle";
+    step.frequency.setValueAtTime(85 + index * 7, start);
+    step.frequency.exponentialRampToValueAtTime(50, start + .09);
+    envelope.gain.setValueAtTime(.001, start);
+    envelope.gain.linearRampToValueAtTime(.085, start + .017);
+    envelope.gain.exponentialRampToValueAtTime(.001, start + .12);
+    step.connect(envelope).connect(volume);
+    step.onended = () => envelope.disconnect();
+    step.start(start);
+    step.stop(start + .13);
+  });
+}
+
 export function typeDialogue(node, text, { voice, maxMs = 950, letterMs = 24, signal, onFrame }) {
   const letters = Array.from(text);
   const interval = Math.min(letterMs, maxMs / Math.max(letters.length, 1));
@@ -77,11 +86,23 @@ export function typeDialogue(node, text, { voice, maxMs = 950, letterMs = 24, si
       }
       const letter = letters[index];
       node.appendData(letter);
-      if (/[\p{L}\p{N}]/u.test(letter)) blip(voice, index);
+      if (voice && /[\p{L}\p{N}]/u.test(letter)) blip(voice, index);
       index++;
       onFrame?.();
       setTimeout(tick, interval);
     }
     tick();
   });
+}
+
+export function dialogueLine(parent, text, options) {
+  const spoken = document.createElement("span");
+  spoken.className = "visually-hidden";
+  spoken.textContent = text;
+  const visual = document.createElement("span");
+  visual.setAttribute("aria-hidden", "true");
+  const letters = document.createTextNode("");
+  visual.append(letters);
+  parent.append(spoken, visual);
+  return typeDialogue(letters, text, options);
 }
