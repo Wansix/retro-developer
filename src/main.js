@@ -26,7 +26,7 @@ function show(id) {
 }
 
 // --- 프롤로그: 스크립트 러너 ---
-const WHO_LABEL = { me: "나", ai: "AI 에이전트", boss: "김 책임" };
+const WHO_LABEL = { me: "나", ai: "AI 에이전트", boss: "김 과장" };
 
 function dialogueLine(parent, text, options) {
   const spoken = document.createElement("span");
@@ -244,7 +244,7 @@ function phaseStory() {
   $("shift-title").textContent = events;
   switch (phase) {
     case "arrive": return state.event.text;
-    case "assign": return "김 책임이 오늘 업무표를 돌린다. 정 수석이 지켜보고 있고, 박 선임은 이미 볼펜 뚜껑을 열었다.";
+    case "assign": return "김 과장이 오늘 업무표를 돌린다. 정 수석이 지켜보고 있고, 박 선임은 이미 볼펜 뚜껑을 열었다.";
     case "morning":
     case "afternoon":
     case "overtime": {
@@ -266,10 +266,10 @@ function phaseStory() {
     case "report":
       if (isFriday(state.day)) {
         $("shift-title").textContent = "금요일 전체 프로젝트 회의";
-        return "기획팀  ‘기능 하나만 더 넣겠습니다.’\n디자인팀  ‘최종 시안은 조금 바뀌었어요.’\n영업팀  ‘납품은 하루 앞당기기로 했습니다.’\nQA팀  ‘이 상태면 검수 시간을 더 주세요.’\n김 책임  ‘신입, 가능하지?’";
+        return "기획팀  ‘기능 하나만 더 넣겠습니다.’\n디자인팀  ‘최종 시안은 조금 바뀌었어요.’\n영업팀  ‘납품은 하루 앞당기기로 했습니다.’\nQA팀  ‘이 상태면 검수 시간을 더 주세요.’\n김 과장  ‘신입, 가능하지?’";
       }
-      return `기능 ${state.progress}/${MISSIONS.length} · 추가 일감 ${state.scope}건. 김 책임이 현황을 묻는다.`;
-    case "leave": return "김 책임이 벽시계를 한 번 보고 자리에 앉는다.";
+      return `기능 ${state.progress}/${MISSIONS.length} · 추가 일감 ${state.scope}건. 김 과장이 현황을 묻는다.`;
+    case "leave": return "김 과장이 벽시계를 한 번 보고 자리에 앉는다.";
   }
 }
 
@@ -362,6 +362,13 @@ function enterOffice(resume = false) {
   const saved = resume ? loadLocal(RUN_KEY) : null;
   state = saved?.state ?? newRun();
   draft = saved?.draft ?? null;
+  if (saved?.state) {
+    // Older saves store the current day's event and its narrative text verbatim.
+    const rename = (text) => text.replaceAll("김 책임", "김 과장").replaceAll("책임님, 커피", "과장님, 커피");
+    state.event.title = rename(state.event.title);
+    state.event.text = rename(state.event.text);
+    state.effects = state.effects.map(rename);
+  }
   shownMission = null;
   show("screen-office");
   prepareWorker();
@@ -457,7 +464,7 @@ function blockInsertion(event) {
   if (!count) return;
   const line = PASTE_LINES[Math.min(count - 1, PASTE_LINES.length - 1)];
   bossSay(line);
-  $("paste-warning").textContent = count === 3 ? `김 책임 · ${line}  [업적 달성]` : `김 책임 · ${line}`;
+  $("paste-warning").textContent = count === 3 ? `김 과장 · ${line}  [업적 달성]` : `김 과장 · ${line}`;
   checkpoint();
 }
 

@@ -165,7 +165,7 @@ export const MISSIONS = [
     check: { type: "function", name: "ready", args: [[[true, false]], [[true, true]], [[false, false]]], expected: ["HOLD", "DEPLOY", "HOLD"] },
   },
 ];
-// 김 책임 상황별 대사 (기획서 §4)
+// 김 과장 상황별 대사 (기획서 §4)
 export const BOSS_LINES = {
   idle: "신입, 막히면 이 선임한테 먼저 물어봐. 나는 고객사 전화 좀 받고.",
   error: "빨간 글씨 뜨는데? 지금 QA한테 보여주면 안 되는 거지?",
@@ -213,7 +213,7 @@ export const TRAVEL_LINES = [
   "Time Travel: COMPLETE",
 ];
 
-// 2006년 첫 출근: boss = 김 책임, ai = 모니터에 뜬 미래의 AI 메시지.
+// 2006년 첫 출근: boss = 김 과장, ai = 모니터에 뜬 미래의 AI 메시지.
 export const SCENE_2006 = [
   { who: "boss", text: "신입! 첫날부터 졸고 있어?" },
   { who: "me", text: "……누구세요?" },

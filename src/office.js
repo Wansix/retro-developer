@@ -133,7 +133,7 @@ export function submitSolution(s) {
   if (s.phase === "morning" && s.remaining >= 35) {
     change(s, { scope: 1 });
     s.stats.calledSimple++;
-    s.effects.push("김 책임이 ‘벌써 끝났어? 이것도 간단해’라며 일감 1건을 추가했다.");
+    s.effects.push("김 과장이 ‘벌써 끝났어? 이것도 간단해’라며 일감 1건을 추가했다.");
   }
   if (s.hp === 0) finish(s, "hospital");
   return true;
@@ -181,7 +181,7 @@ function handleAssignment(s, id) {
   if (id === "volunteer") return chooseTickets(s, [s.available.at(-1)], { score: 20 }, "정 수석이 신입의 이름을 수첩에 적었다. 평가 +20.");
   if (id === "refuse") {
     const backed = s.relations.lee >= 2 || s.relations.park >= 2;
-    return chooseTickets(s, [], { score: backed ? -1 : -6 }, backed ? "선임이 이미 맡은 일을 증언했다." : "김 책임이 기존 업무부터 끝내라고 했다. 평가 −6.");
+    return chooseTickets(s, [], { score: backed ? -1 : -6 }, backed ? "선임이 이미 맡은 일을 증언했다." : "김 과장이 기존 업무부터 끝내라고 했다. 평가 −6.");
   }
   if (id === "trade") {
     const ticket = s.parkPriority.find((index) => s.available.includes(index)) ?? s.available[0];
@@ -192,7 +192,7 @@ function handleAssignment(s, id) {
   const taken = s.parkPriority.find((i) => s.available.includes(i)) ?? s.available[0];
   s.available = s.available.filter((i) => i !== taken);
   s.effects = [`박 선임이 ${s.tickets[taken].name}에 먼저 이름을 적었다.`];
-  if (s.waits === 2) return chooseTickets(s, s.available.slice(-2), { score: -3 }, "회의가 끝나기 직전, 김 책임이 남은 어려운 두 건을 함께 넘겼다.");
+  if (s.waits === 2) return chooseTickets(s, s.available.slice(-2), { score: -3 }, "회의가 끝나기 직전, 김 과장이 남은 어려운 두 건을 함께 넘겼다.");
 }
 
 function handleNegotiation(s, id) {
@@ -275,7 +275,7 @@ export function options(s) {
         choice("rest", "혼자 먹고 잠깐 쉰다", "체력 +10"),
         choice("park", "박 선임과 밥을 먹는다", "체력 +5 · 박 선임 관계 +2"),
         choice("help", "이 선임과 먹고 밀린 일을 돕는다", "체력 +3 · 이 선임 관계 +2 · 추가 일감을 맡을 수 있음"),
-        choice("kim", "김 책임 대신 전화를 받고 같이 먹는다", "체력 +4 · 인사평가 +8"),
+        choice("kim", "김 과장 대신 전화를 받고 같이 먹는다", "체력 +4 · 인사평가 +8"),
       ];
     case "negotiate":
       return [
@@ -314,7 +314,7 @@ export function act(s, id) {
       s.nextMeeting = 0;
       if (id === "automate") {
         s.stats.calledSimple++;
-        s.effects = ["검수표를 자동으로 만들었다. 김 책임이 절약된 90분을 보고 ‘간단한 일’ 90분을 추가했다."];
+        s.effects = ["검수표를 자동으로 만들었다. 김 과장이 절약된 90분을 보고 ‘간단한 일’ 90분을 추가했다."];
       }
       s.phase = "assign";
       break;
@@ -340,7 +340,7 @@ export function act(s, id) {
       } else {
         s.coffee = true;
         change(s, { minutes: -25, hp: 8 });
-        s.effects = ["김 책임 몫도 함께 타 왔다."];
+        s.effects = ["김 과장 몫도 함께 타 왔다."];
       }
       break;
     case "lunch":
@@ -353,7 +353,7 @@ export function act(s, id) {
         s.effects = ["박 선임이 내일 회의에서 먼저 말을 걸라고 했다."];
       } else if (id === "kim") {
         change(s, { hp: 4, score: 8 });
-        s.effects = ["김 책임  ‘위에는 된다고 해야 하고 아래에는 해달라고 해야 하네. 같이 먹어줘서 고맙다.’"];
+        s.effects = ["김 과장  ‘위에는 된다고 해야 하고 아래에는 해달라고 해야 하네. 같이 먹어줘서 고맙다.’"];
       } else {
         change(s, { hp: 10 });
         s.effects = ["호출기 없이 먹는 밥은 오랜만이다."];
@@ -384,7 +384,7 @@ export function act(s, id) {
         change(s, { hp: -24, score: 16, deadline: compressed ? -1 : 0 });
         s.remaining = 185;
         s.phase = "overtime";
-        s.effects = [compressed ? "‘지난번에도 되던데?’ 새 마감이 하루 당겨졌다." : "김 책임이 비품 창고에서 컵라면을 하나 꺼냈다."];
+        s.effects = [compressed ? "‘지난번에도 되던데?’ 새 마감이 하루 당겨졌다." : "김 과장이 비품 창고에서 컵라면을 하나 꺼냈다."];
       }
       break;
   }
