@@ -1,42 +1,29 @@
-// 《옛날 개발자》 — 프롤로그 + 코어 루프 + UI
-const RUN_TIMEOUT_MS = 8000;
-const MAX_OUTPUT = 4000;
-const TOTAL_DAYS = 10;
-const IDLE_MS = 45000;
+import { BOSS_LINES, MISSIONS, PASTE_LINES, PROLOGUE_2026, SCENE_2006, TRAVEL_LINES } from "./missions.js";
+import { DEPARTMENTS, ENDINGS, EPILOGUE, LUNCH } from "./office-content.js";
+import { PHASES, RELATION_NAMES, act, canSubmit, codingCost, currentMission, isCoding, isFriday, newRun, options, recordFor, recordPaste, submitSolution } from "./office.js";
+import { METRICS, RULESET, formatDate } from "./records-schema.js";
+import { initRecords, openRecords, syncRecord } from "./records.js";
 
-const initialState = () => ({
-  day: 1,
-  hour: 9,
-  hp: 100,
-  ap: 3,
-  progress: 0,
-  score: 0,
-  direct: 0,
-  choiScore: 0,
-  choiDirect: 0,
-  overtime: 0,
-  pasteCount: 0,
-  hintCount: 0,
-  delegateCount: 0,
-  flatterCount: 0,
-  skipCount: 0,
-  missionIndex: 0,
-  bossLines: 0,
-  tasksAssigned: 0,
-  parkGone: false,
-  bossAway: false,
-  over: false,
-});
-let state = initialState();
+const $ = (id) => document.getElementById(id);
+const RUN_KEY = "retro-office-run-v1";
+const BEST_KEY = "retro-office-best-v1";
+const editor = $("editor");
+let state;
+let draft = null;
+let shownMission;
+let busy = false;
+let idle;
+let bossVersion = 0;
 
 // --- 화면 전환 ---
 function show(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
+  window.scrollTo(0, 0);
 }
 
 // --- 프롤로그: 스크립트 러너 ---
-const WHO_LABEL = { me: "나", ai: "AI 에이전트", boss: "김 과장" };
+const WHO_LABEL = { me: "나", ai: "AI 에이전트", boss: "김 책임" };
 
 function addChatTo(logId, text, who) {
   const log = document.getElementById(logId);
@@ -142,645 +129,440 @@ function enter2006() {
   });
 }
 
-// --- Python 워커 ---
-let worker = null;
-let jobSeq = 0;
-let pending = null;
-
-function createWorker() {
-  worker = new Worker("src/pyworker.js");
-  worker.onmessage = (e) => {
-    const msg = e.data;
-    if (msg.type === "result" && pending && msg.jobId === pending.jobId) {
-      clearTimeout(pending.timer);
-      const p = pending;
-      pending = null;
-      p.resolve(msg);
-    }
-  };
+function loadLocal(key) {
+  try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
 }
 
-function runPython(code) {
-  return new Promise((resolve) => {
-    if (!worker) createWorker();
-    const jobId = ++jobSeq;
-    const timer = setTimeout(() => {
-      worker.terminate();
-      worker = null;
-      pending = null;
-      resolve({ ok: false, timeout: true });
-    }, RUN_TIMEOUT_MS);
-    pending = { jobId, resolve, timer };
-    worker.postMessage({ code, jobId });
-  });
+function saveLocal(key, value) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
+  } catch { /* A restricted browser can still play in memory. */ }
 }
 
-// --- HUD ---
-function flash(id) {
-  const el = document.getElementById(id).closest(".hud-item");
-  if (!el) return;
-  el.classList.remove("flash");
-  void el.offsetWidth;
-  el.classList.add("flash");
+function checkpoint() {
+  if (!state.ending) saveLocal(RUN_KEY, { state, draft });
 }
 
-function renderStatus() {
-  const date = `입사 ${state.day}일차 ${String(state.hour).padStart(2, "0")}:00`;
-  document.getElementById("hud-date").textContent = date;
-  document.getElementById("hud-dday").textContent = `D-${Math.max(0, TOTAL_DAYS - state.day)}`;
-  document.getElementById("bar-hp").style.width = `${state.hp}%`;
-  document.getElementById("hud-hp").textContent = state.hp;
-  document.getElementById("bar-progress").style.width = `${(state.progress / MISSIONS.length) * 100}%`;
-  document.getElementById("hud-progress").textContent = `${state.progress}/${MISSIONS.length}`;
-  document.getElementById("hud-level").textContent = state.direct + 1;
-  document.getElementById("hud-score").textContent = state.score;
-  document.getElementById("hud-ap").textContent = "■".repeat(Math.max(0, state.ap)) || "—";
-  updateActionButtons();
+const schedule = [
+  ["arrive", "출근"], ["assign", "업무 배분"], ["morning", "코딩 미션"],
+  ["lunch", "점심시간"], ["negotiate", "코딩·협상"], ["report", "진행 보고"], ["leave", "퇴근"],
+];
+for (const [key, label] of schedule) {
+  const item = document.createElement("li");
+  item.dataset.step = key;
+  item.textContent = `${PHASES[key][0]}  ${label}`;
+  $("schedule").append(item);
 }
 
-function tickClock() {
-  state.hour = Math.min(23, state.hour + 1);
+function replaceList(parent, values) {
+  parent.replaceChildren(...values.map((text) => {
+    const item = document.createElement("li");
+    item.textContent = text;
+    return item;
+  }));
 }
 
-// --- 김 과장 ---
-let idleTimer = null;
-
-function bossSay(text, aiGenerated = false) {
-  state.bossLines += 1;
-  const line = document.getElementById("boss-line");
-  line.textContent = text;
-  if (aiGenerated) {
+function bossSay(line, generated = false) {
+  bossVersion++;
+  $("boss-line").textContent = line;
+  if (generated) {
     const tag = document.createElement("span");
     tag.className = "ai-tag";
     tag.textContent = "AI";
-    line.appendChild(tag);
+    $("boss-line").appendChild(tag);
   }
-  const dlg = document.getElementById("boss-dialog");
-  dlg.classList.remove("talk");
-  void dlg.offsetWidth;
-  dlg.classList.add("talk");
 }
 
-// AI 김 과장 대사 (Phase 3.6): 즉시 고정 대사를 보여주고, 서버가 동적 대사를 주면 교체.
-// 실패·시간 초과·키 미설정(503) 시 고정 대사가 그대로 유지된다. 게임 로직에는 관여하지 않는다.
-async function bossSayDynamic(kind, ctx = {}) {
+async function react(kind) {
   bossSay(BOSS_LINES[kind]);
+  const version = bossVersion;
   try {
-    const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 6000);
     const res = await fetch("/api/boss-line", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        kind,
-        ...ctx,
-        day: state.day,
-        hp: state.hp,
-        ap: state.ap,
-        progress: state.progress,
-        overtime: state.overtime,
-        hintCount: state.hintCount,
-      }),
-      signal: ctl.signal,
+      body: JSON.stringify({ kind, day: state.day, hp: state.hp, overtime: state.stats.overtime }),
+      signal: AbortSignal.timeout(6000),
     });
-    clearTimeout(timer);
     if (!res.ok) return;
     const data = await res.json();
-    if (data && typeof data.line === "string" && data.line.trim()) {
-      bossSay(data.line.trim(), true);
-    }
-  } catch {
-    // 폴Fallback: 고정 대사 유지
-  }
+    if (version === bossVersion && typeof data.line === "string" && data.line.trim()) bossSay(data.line.trim().slice(0, 120), true);
+  } catch { /* The scripted dialogue is already visible. */ }
 }
 
 function resetIdle() {
-  clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => bossSayDynamic("idle"), IDLE_MS);
+  clearTimeout(idle);
+  if (!editor.disabled && !$("coding-panel").classList.contains("hidden")) idle = setTimeout(() => react("idle"), 45000);
 }
 
-// --- 레트로 알림창 ---
-function showEvent(title, body, onOk) {
-  document.getElementById("event-title").textContent = title;
-  document.getElementById("event-body").textContent = body;
-  document.getElementById("modal-event").classList.remove("hidden");
-  document.getElementById("event-ok").onclick = () => {
-    document.getElementById("modal-event").classList.add("hidden");
-    if (onOk) onOk();
-  };
-}
-
-// --- 미션 ---
-function loadMission() {
-  const m = MISSIONS[state.missionIndex];
-  document.getElementById("mission-title").textContent = m.title;
-  document.getElementById("mission-brief").textContent = m.brief;
-  document.getElementById("mission-grammar").textContent = m.grammar;
-  document.getElementById("mission-example").textContent = "예시 코드) " + m.example;
-  const exOut = document.getElementById("mission-example-out");
-  exOut.textContent = "예시 출력) " + m.exampleOut;
-  exOut.classList.toggle("hidden", !m.exampleOut);
-  document.getElementById("mission-req").textContent = m.requirement;
-  document.getElementById("mission-expected").textContent = m.expectedOut;
-  document.getElementById("hint-box").classList.add("hidden");
-  document.getElementById("editor").value = m.starter;
-  document.getElementById("editor").disabled = false;
-  document.getElementById("btn-run").disabled = false;
-  document.getElementById("btn-submit").disabled = false;
-  setOutput("실행 버튼을 눌러 결과를 확인하세요.", "");
-  bossSay(m.boss);
-  resetIdle();
-}
-
-function setOutput(text, cls) {
-  const out = document.getElementById("output");
-  out.textContent = text.length > MAX_OUTPUT ? text.slice(0, MAX_OUTPUT) + "\n... (출력이 잘렸습니다)" : text;
-  out.className = cls;
-}
-
-function setBusy(busy) {
-  document.getElementById("btn-run").disabled = busy;
-  document.getElementById("btn-submit").disabled = busy;
-}
-
-function normalize(s) {
-  return String(s).replace(/\r\n/g, "\n").trim();
-}
-
-function grade(m, stdout) {
-  const out = normalize(stdout);
-  if (m.check.type === "output") return out === m.check.expected;
-  const lastLine = out.split("\n").filter(Boolean).pop() || "";
-  if (m.check.type === "number") {
-    const v = Number(lastLine);
-    return !Number.isNaN(v) && v === m.check.expected;
-  }
-  return lastLine === m.check.expected;
-}
-
-async function handleRun() {
-  setBusy(true);
-  setOutput("실행 중...", "");
-  const res = await runPython(document.getElementById("editor").value);
-  setBusy(false);
-  if (res.timeout) {
-    setOutput("시간 초과: 실행이 너무 오래 걸려 중단했습니다. 무한 루프를 확인하세요.", "error");
-    bossSayDynamic("error", { situation: "infinite_loop" });
-  } else if (!res.ok) {
-    setOutput(res.stdout + "\n" + lastErrorLine(res.error), "error");
-    bossSayDynamic("error", { error: lastErrorLine(res.error) });
-  } else {
-    setOutput(res.stdout || "(출력 없음)", "");
-  }
-  resetIdle();
-}
-
-function lastErrorLine(err) {
-  const lines = String(err).trim().split("\n");
-  return lines[lines.length - 1];
-}
-
-async function handleSubmit() {
-  setBusy(true);
-  setOutput("검수 중...", "");
-  const res = await runPython(document.getElementById("editor").value);
-  setBusy(false);
-  const m = MISSIONS[state.missionIndex];
-
-  if (res.timeout) {
-    setOutput("시간 초과: 실행이 너무 오래 걸려 중단했습니다. 무한 루프를 확인하세요.", "error");
-    bossSayDynamic("error", { situation: "infinite_loop" });
-    return;
-  }
-  if (!res.ok) {
-    setOutput(res.stdout + "\n" + lastErrorLine(res.error), "error");
-    bossSayDynamic("error", { error: lastErrorLine(res.error) });
-    return;
-  }
-  if (!grade(m, res.stdout)) {
-    setOutput(`결과가 기대와 다릅니다.\n\n[나온 출력]\n${res.stdout || "(출력 없음)"}\n[기대 결과]\n${m.expectedOut}`, "error");
-    bossSay(BOSS_LINES.wrong);
-    return;
-  }
-  completeMission("direct", res.stdout);
-  resetIdle();
-}
-
-// 완료 처리: kind = 'direct' | 'delegate' | 'skip'
-function completeMission(kind, stdout) {
-  if (kind === "direct") state.ap -= 1;
-  if (kind === "delegate") state.ap -= 2;
-  state.progress += 1;
-  if (kind === "direct") {
-    state.hp = Math.max(0, state.hp - 5);
-    state.score += 35;
-    state.direct += 1;
-    setOutput(stdout, "ok");
-  } else if (kind === "delegate") {
-    state.score += 20;
-    state.delegateCount += 1;
-  } else {
-    state.skipCount += 1;
-    setOutput("이 업무는 넘어갔습니다. (진행은 되지만 점수는 없습니다)", "");
-  }
-  tickClock();
-  ["hud-progress", "hud-score", "hud-hp", "hud-ap"].forEach(flash);
-  renderStatus();
-  if (kind === "skip") {
-    bossSay(BOSS_LINES.skip);
-  } else {
-    bossSayDynamic("success", { missionId: MISSIONS[state.missionIndex].id, direct: kind === "direct" });
-  }
-
-  if (checkEnding()) return;
-
-  state.missionIndex += 1;
-  state.tasksAssigned += 1;
-  setTimeout(loadMission, 800);
-}
-
-// --- 행동 버튼 ---
-function canAct(cost) {
-  return !state.over && state.ap >= cost;
-}
-
-function updateActionButtons() {
-  const map = {
-    "act-hint": 1, "act-coffee": 1, "act-flatter": 1,
-    "act-delegate": 2, "act-negotiate": 1, "act-skip": 0, "act-overtime": 0, "act-leave": 0,
-  };
-  for (const [id, cost] of Object.entries(map)) {
-    const btn = document.getElementById(id);
-    let disabled = !canAct(cost);
-    if (id === "act-overtime" && state.hp <= 25) disabled = true;
-    if (id === "act-hint" && document.getElementById("hint-box").classList.contains("hidden") === false) disabled = true;
-    if (id === "act-hint" && state.parkGone) disabled = true;
-    btn.disabled = disabled;
+function hud() {
+  $("hud-date").textContent = `${state.day}일차 · ${formatDate(state.day)}`;
+  $("hud-dday").textContent = `D-${state.deadline - state.day}`;
+  $("hud-hp").textContent = state.hp;
+  $("bar-hp").style.width = `${state.hp}%`;
+  $("hud-progress").textContent = `${state.progress}/${MISSIONS.length}`;
+  $("bar-progress").style.width = `${100 * state.progress / MISSIONS.length}%`;
+  $("hud-score").textContent = state.score;
+  $("hud-scope").textContent = `${state.scope}건`;
+  $("relations").replaceChildren(...Object.entries(RELATION_NAMES).flatMap(([id, name]) => {
+    const dt = document.createElement("dt");
+    const dd = document.createElement("dd");
+    dt.textContent = name;
+    const value = state.relations[id];
+    dd.textContent = value > 0 ? `+${value}` : String(value);
+    return [dt, dd];
+  }));
+  const active = ({ afternoon: "negotiate", overtime: "leave" })[state.phase] ?? state.phase;
+  for (const node of $("schedule").children) {
+    if (node.dataset.step === active) node.setAttribute("aria-current", "step");
+    else node.removeAttribute("aria-current");
   }
 }
 
-function doHint() {
-  if (!canAct(1)) return;
-  state.ap -= 1;
-  state.hintCount += 1;
-  tickClock();
-  const m = MISSIONS[state.missionIndex];
-  const hint = document.getElementById("hint-box");
-  hint.textContent = m.hint;
-  hint.classList.remove("hidden");
-  bossSay(BOSS_LINES.hint);
-  renderStatus();
-  resetIdle();
-}
-
-function doCoffee() {
-  if (!canAct(1)) return;
-  state.ap -= 1;
-  state.hp = Math.min(100, state.hp + 15);
-  tickClock();
-  flash("hud-hp");
-  bossSayDynamic("coffee");
-  renderStatus();
-  resetIdle();
-}
-
-function doFlatter() {
-  if (!canAct(1)) return;
-  state.ap -= 1;
-  state.score += 45;
-  state.flatterCount += 1;
-  tickClock();
-  flash("hud-score");
-  bossSay(BOSS_LINES.flatter);
-  renderStatus();
-  resetIdle();
-}
-
-function doDelegate() {
-  if (!canAct(2)) return;
-  bossSay(BOSS_LINES.delegate);
-  completeMission("delegate");
-  resetIdle();
-}
-
-function doNegotiate() {
-  if (!canAct(1)) return;
-  state.ap -= 1;
-  tickClock();
-  bossSay(BOSS_LINES.negotiate);
-  showEvent("일정 협상", "김 과장은 일정 협상을 들어줄 기미가 없다.\n\"일정이 왜 필요하지? 일이나 해.\"");
-  renderStatus();
-  resetIdle();
-}
-
-function doSkip() {
-  if (state.over) return;
-  completeMission("skip");
-  resetIdle();
-}
-
-function doOvertime() {
-  if (state.over || state.hp <= 25) return;
-  state.ap += 2;
-  state.hp = Math.max(0, state.hp - 25);
-  state.overtime += 1;
-  state.hour = 21;
-  flash("hud-hp");
-  renderStatus();
-  showEvent("야근", "불 꺼진 사무실에서 모니터 불빛만 남았다.\n행동력 +2, 첼력 −25.");
-  if (checkEnding()) return;
-  resetIdle();
-}
-
-function doLeave() {
-  if (state.over) return;
-  bossSayDynamic("leave");
-  state.choiScore += 65;
-  showCompare();
-}
-
-// --- 일일 비교 ---
-function showCompare() {
-  document.getElementById("cmp-day").textContent = state.day;
-  const rows = [
-    ["완료 업무", `${state.progress}건`, `${Math.floor(state.day * 0.5)}건`],
-    ["직접 해결", `${state.direct}건`, `${state.choiDirect}건`],
-    ["야근", `${state.overtime}회`, "0회"],
-    ["첼력", state.hp, 100],
-    ["인사평가", `${state.score}점`, `${state.choiScore}점`],
-    ["월급", "180만 원", "180만 원"],
-  ];
-  const tbody = document.querySelector("#cmp-table tbody");
-  tbody.innerHTML = rows
-    .map(([k, a, b]) => `<tr><td>${k}</td><td>${a}</td><td>${b}</td></tr>`)
-    .join("");
-  document.getElementById("cmp-boss").textContent =
-    state.score >= state.choiScore
-      ? "김 과장: \"신입, 오늘은 좀 했네. 내일도 그렇게 해.\""
-      : "김 과장: \"최 사원은 참 사회생활을 잘해. 자네도 좀 본받아.\"";
-  document.getElementById("modal-compare").classList.remove("hidden");
-}
-
-document.getElementById("cmp-ok").onclick = () => {
-  document.getElementById("modal-compare").classList.add("hidden");
-  nextDay();
-};
-
-function nextDay() {
-  state.day += 1;
-  state.hour = 9;
-  state.hp = Math.min(100, state.hp + 20);
-  state.ap = 3;
-  if (checkEnding()) return;
-  renderStatus();
-  bossSay(BOSS_LINES.morningAfter);
-  rollDailyEvent();
-  resetIdle();
-}
-
-// 랜덤 사무실 이벤트 (기획서 §4 축소판)
-function rollDailyEvent() {
-  if (Math.random() > 0.5) return;
-  const pool = [];
-  if (!state.parkGone) pool.push("park-quit");
-  pool.push(state.bossAway ? "meeting-cancel" : "boss-meeting");
-  const ev = pool[Math.floor(Math.random() * pool.length)];
-
-  if (ev === "park-quit") {
-    state.parkGone = true;
-    document.getElementById("spr-park").style.display = "none";
-    showEvent("인사팀 공지",
-      "박 대리가 퇴사했습니다.\n박 대리 찬스가 비활성화되었습니다.\n박 대리의 업무가 당신에게 이전되었습니다.");
-  } else if (ev === "boss-meeting") {
-    state.bossAway = true;
-    document.getElementById("spr-boss").classList.add("away");
-    state.ap += 1;
-    showEvent("사내 공지",
-      "김 과장의 회의가 잡혔습니다.\n상사 부재 버프를 획득했습니다. (행동력 +1)");
-  } else {
-    state.bossAway = false;
-    document.getElementById("spr-boss").classList.remove("away");
-    showEvent("사내 공지",
-      "김 과장의 회의가 취소되었습니다.\n김 과장이 자리로 돌아왔습니다.");
-  }
-  renderStatus();
-}
-
-// --- 엔딩 (기획서 §5 우선순위) ---
-function checkEnding() {
-  if (state.over) return true;
-  if (state.hp <= 0) return endGame("hospital"), true;
-  if (state.progress >= MISSIONS.length) {
-    if (state.direct === 0) return endGame("manager"), true;
-    if (state.score > state.choiScore) return endGame("golden"), true;
-    return endGame("normal"), true;
-  }
-  if (state.day > TOTAL_DAYS) return endGame("intern"), true;
-  return false;
-}
-
-const ENDINGS = {
-  hospital: { title: "병원으로 출근", desc: "첼력이 바닥났다. 프로젝트보다 몸이 먼저 퇴근했다.", award: false },
-  intern: { title: "영원한 신입", desc: "납기를 넘겼다. 프로젝트는 끝나지 않고, 신입도 끝나지 않는다.", award: false },
-  manager: { title: "차기 김 과장", desc: "코드는 한 줄도 안 썼지만 프로젝트는 끝났다. 회사가 그런 사람을 임원으로 뽑는다.", award: false },
-  golden: { title: "골든 키보드 수상", desc: "직접 해결한 실력과 인정받은 평가. 개발자판 발롱도르의 주인공이다.", award: true },
-  normal: { title: "평범한 개발자", desc: "프로젝트는 끝냈지만 최 사원의 평가를 넘지 못했다. 월급은 똑같다.", award: false },
-};
-
-// 귀환 성공 엔딩은 반전 시퀀스를 먼저 재생한다 (Phase 3.5)
-const TWIST_ENDINGS = ["manager", "golden", "normal"];
-
-function endGame(key) {
-  state.over = true;
-  saveBest(key);
-  if (TWIST_ENDINGS.includes(key)) {
-    playTwist(() => showEndingResult(key));
-  } else {
-    showEndingResult(key);
-  }
-  return true;
-}
-
-function typeLines(el, lines, done) {
-  let i = 0;
-  const iv = setInterval(() => {
-    if (i >= lines.length) { clearInterval(iv); done(); return; }
-    el.textContent += lines[i++] + "\n";
-  }, 200);
-}
-
-function playTwist(done) {
-  show("screen-twist");
-  document.getElementById("chat-log-twist").innerHTML = "";
-  document.getElementById("twist-syslog").classList.add("hidden");
-  document.getElementById("twist-syslog").textContent = "";
-  document.getElementById("twist-achievement").classList.add("hidden");
-  runScript(TWIST_BEFORE, "chat-log-twist", "buttons-twist", () => {
-    const term = document.getElementById("twist-terminal");
-    term.classList.add("glitching");
-    setTimeout(() => {
-      term.classList.remove("glitching");
-      const log = document.getElementById("twist-syslog");
-      log.classList.remove("hidden");
-      const stats = { bossLines: state.bossLines, tasks: state.tasksAssigned };
-      typeLines(log, twistSystemLog(stats), () => {
-        runScript(TWIST_AFTER, "chat-log-twist", "buttons-twist", () => {
-          const ach = document.getElementById("twist-achievement");
-          ach.textContent = TWIST_ACHIEVEMENT;
-          ach.classList.remove("hidden");
-          const box = document.getElementById("buttons-twist");
-          box.innerHTML = "";
-          const b = document.createElement("button");
-          b.className = "btn primary";
-          b.textContent = "엔딩 크레딧";
-          b.onclick = () => showCredits(done);
-          box.appendChild(b);
-        });
-      });
-    }, 1200);
-  });
-}
-
-function showCredits(done) {
-  const ul = document.getElementById("credits-list");
-  ul.innerHTML = "";
-  CREDITS.forEach((c, i) => {
-    const li = document.createElement("li");
-    li.textContent = c;
-    li.style.animationDelay = `${i * 0.45}s`;
-    ul.appendChild(li);
-  });
-  show("screen-credits");
-  document.getElementById("btn-credits-ok").onclick = done;
-}
-
-function saveBest(key) {
-  try {
-    const prev = JSON.parse(localStorage.getItem("retro-best") || "null");
-    const rec = {
-      score: state.score,
-      ending: ENDINGS[key].title,
-      cleared: state.progress >= MISSIONS.length,
-      day: state.day,
-    };
-    if (!prev || rec.score > prev.score) {
-      localStorage.setItem("retro-best", JSON.stringify(rec));
+function phaseStory() {
+  const phase = state.phase;
+  const [clock, title] = PHASES[phase];
+  const events = phase === "arrive" ? state.event.title : title;
+  $("shift-clock").textContent = clock;
+  $("shift-title").textContent = events;
+  switch (phase) {
+    case "arrive": return state.event.text;
+    case "assign": return "김 책임이 오늘 업무표를 돌린다. 정 수석이 지켜보고 있고, 박 선임은 이미 볼펜 뚜껑을 열었다.";
+    case "morning":
+    case "afternoon":
+    case "overtime": {
+      const budget = `남은 업무 시간 ${state.remaining}분.`;
+      if (!currentMission(state)) return `${budget} 필수 기능 검수가 끝났다. 남은 추가 일감을 정리하고 퇴근하면 배포할 수 있다.`;
+      if (state.solvedToday) return `${budget} 오늘 배정된 코딩 미션은 검수를 통과했다.`;
+      const needed = codingCost(state);
+      return `${budget} ${state.remaining >= needed ? `배정 업무와 미션 제출에 ${needed}분이 필요하다.` : `제출에는 ${needed}분이 필요하다. 사전 조사로 시간을 나눠 쓸 수 있다.`}`;
     }
-  } catch { /* 저장 불가 환경 무시 */ }
+    case "lunch": {
+      const [who, line] = LUNCH[(state.shift - 1) % LUNCH.length];
+      return `${who}  ‘${line}’`;
+    }
+    case "negotiate": {
+      const team = DEPARTMENTS[state.department];
+      $("shift-title").textContent = `${team.name} · ${state.request[0]}`;
+      return `${team.name}  ‘${state.request[1]}’\n현재 관계 ${state.relations[state.department]} · 요청 수락 시 오후 ${state.request[2]}분 소요`;
+    }
+    case "report":
+      if (isFriday(state.day)) {
+        $("shift-title").textContent = "금요일 전체 프로젝트 회의";
+        return "기획팀  ‘기능 하나만 더 넣겠습니다.’\n디자인팀  ‘최종 시안은 조금 바뀌었어요.’\n영업팀  ‘납품은 하루 앞당기기로 했습니다.’\nQA팀  ‘이 상태면 검수 시간을 더 주세요.’\n김 책임  ‘신입, 가능하지?’";
+      }
+      return `기능 ${state.progress}/${MISSIONS.length} · 추가 일감 ${state.scope}건. 김 책임이 현황을 묻는다.`;
+    case "leave": return "김 책임이 벽시계를 한 번 보고 자리에 앉는다.";
+  }
 }
 
-function loadBest() {
-  try { return JSON.parse(localStorage.getItem("retro-best") || "null"); }
-  catch { return null; }
+function renderChoices() {
+  $("choices").replaceChildren(...options(state).map(({ id, label, detail, disabled }) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "act-btn";
+    if (id.startsWith("ticket-")) btn.classList.add("ticket-choice");
+    btn.textContent = label;
+    btn.disabled = busy || disabled;
+    if (detail) {
+      const description = document.createElement("span");
+      description.className = "cost";
+      description.textContent = detail;
+      btn.append(description);
+    }
+    btn.addEventListener("click", () => {
+      if (busy || !act(state, id)) return;
+      if (state.ending) {
+        endRun();
+        return;
+      }
+      renderOffice(true);
+      if (id === "coffee") react("coffee");
+    });
+    return btn;
+  }));
 }
 
-function showEndingResult(key) {
-  const e = ENDINGS[key];
-  document.getElementById("ending-title").textContent = e.title;
-  document.getElementById("ending-desc").textContent = e.desc;
-  document.getElementById("ending-award").textContent =
-    e.award ? "🏆 골든 키보드상 수여 — 회사 최우수 사원" : "";
-  const rows = [
-    ["최종 인사평가", `${state.score}점 (최 사원 ${state.choiScore}점)`],
-    ["동기와의 순위", state.score > state.choiScore ? "1위" : state.score === state.choiScore ? "동점" : "2위"],
-    ["직접 해결", `${state.direct}건`],
-    ["완료 업무", `${state.progress}/${MISSIONS.length}건`],
-    ["야근", `${state.overtime}회`],
-    ["복붙 적발", `${state.pasteCount}회`],
-    ["박 대리 찬스", `${state.hintCount}회`],
-    ["위임 / 아부", `${state.delegateCount}회 / ${state.flatterCount}회`],
-    ["포기", `${state.skipCount}회`],
-    ["최종 첼력", state.hp],
-  ];
-  document.querySelector("#ending-table tbody").innerHTML = rows
-    .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
-    .join("");
-  const best = loadBest();
-  document.getElementById("ending-best").textContent = best
-    ? `개인 최고 기록: ${best.score}점 — ${best.ending}${best.cleared ? ` (${best.day}일차 클리어)` : ""}`
-    : "";
-  show("screen-ending");
-  return true;
+function renderCoding() {
+  const mission = currentMission(state);
+  const visible = isCoding(state.phase) && mission && !state.solvedToday;
+  $("coding-panel").classList.toggle("hidden", !visible);
+  if (!visible) {
+    clearTimeout(idle);
+    return;
+  }
+  if (shownMission !== mission.id) {
+    shownMission = mission.id;
+    $("mission-title").textContent = mission.title;
+    $("mission-brief").textContent = mission.brief;
+    $("mission-grammar").textContent = mission.grammar;
+    $("mission-example").textContent = mission.example;
+    $("mission-example-out").textContent = mission.exampleOut ?? "";
+    $("mission-example-out").classList.toggle("hidden", !mission.exampleOut);
+    $("mission-req").textContent = mission.requirement;
+    $("mission-expected").textContent = mission.expectedOut;
+    $("hint-box").textContent = mission.hint;
+    $("mission-help").open = false;
+    editor.value = draft?.id === mission.id ? draft.code : mission.starter;
+    $("paste-warning").textContent = "";
+    output("실행 버튼을 눌러 결과를 확인하세요.");
+  }
+  const cost = codingCost(state);
+  $("btn-submit").textContent = `업무 제출 · ${cost}분`;
+  $("btn-submit").disabled = busy || !canSubmit(state);
+  $("btn-run").disabled = busy;
+  editor.disabled = busy;
+  resetIdle();
 }
 
-// --- 복붙 차단 ---
-function onPasteAttempt(e) {
-  e.preventDefault();
-  const line = PASTE_LINES[Math.min(state.pasteCount, PASTE_LINES.length - 1)];
-  state.pasteCount += 1;
-  const warn = document.getElementById("paste-warning");
-  warn.textContent = `김 과장: "${line}"`;
-  warn.classList.remove("hidden");
-  bossSay(line);
+function renderOffice(focus = false) {
+  bossVersion++;
+  hud();
+  $("shift-story").textContent = phaseStory();
+  replaceList($("shift-effects"), state.effects);
+  renderChoices();
+  renderCoding();
+  checkpoint();
+  if (focus) $("shift-title").focus({ preventScroll: true });
+  if (state.phase === "arrive") {
+    bossSay(state.day === 1
+      ? "정 수석이 기술 방향을 잡고, 나랑 박 선임, 이 선임이 쇼핑몰을 같이 맡는다. 자네는 오늘부터 사원이야."
+      : "출근했구나. 오늘 일정부터 보자.");
+  } else if (isCoding(state.phase) && currentMission(state) && !state.solvedToday) {
+    bossSay(currentMission(state).boss);
+  } else {
+    bossSay(({
+      assign: "인원은 그대로고 할 일은 늘었어. 업무표 보고 이야기하자.",
+      lunch: "밥은 같이 먹자. 전화는 이번엔 내가 받을게.",
+      negotiate: "합의한 건 메일로 남겨 둬. 내가 고객한테 설명할 때도 필요해.",
+      report: "문제가 있으면 지금 말해줘. 그래야 나도 위에 보고할 수 있어.",
+      leave: BOSS_LINES.leave,
+    })[state.phase] ?? "오늘 처리할 수 있는 일부터 보자.");
+  }
 }
 
-// --- 시작 / 배선 ---
-function enterOffice() {
+function enterOffice(resume = false) {
+  const saved = resume ? loadLocal(RUN_KEY) : null;
+  state = saved?.state ?? newRun();
+  draft = saved?.draft ?? null;
+  shownMission = null;
   show("screen-office");
-  renderStatus();
-  loadMission();
+  prepareWorker();
+  renderOffice(true);
 }
 
-document.getElementById("btn-start").onclick = () => {
-  show("screen-intro");
-  document.getElementById("chat-log").innerHTML = "";
-  document.getElementById("agent-term").textContent = "";
-  document.getElementById("screen-intro").classList.remove("anger-1", "anger-2", "anger-3");
-  runScript(PROLOGUE_2026, "chat-log", "intro-buttons", startTravel, {
-    onAnger: escalateAnger,
-    termId: "agent-term",
+function output(text, kind = "") {
+  $("output").textContent = text.length > 4000 ? text.slice(0, 4000) + "\n… (출력 잘림)" : text;
+  $("output").className = kind;
+}
+
+let python;
+let pending;
+let jobId = 0;
+
+function stopWorker(result) {
+  python?.worker.terminate();
+  python = null;
+  if (pending) completeJob(result);
+}
+
+function completeJob(result) {
+  const job = pending;
+  pending = null;
+  clearTimeout(job.timer);
+  job.resolve(result);
+}
+
+function prepareWorker() {
+  if (python) return python;
+  const worker = new Worker("src/pyworker.js?v=3");
+  python = { worker, ready: false };
+  worker.onmessage = ({ data }) => {
+    if (python?.worker !== worker) return;
+    if (data.type === "ready") {
+      python.ready = true;
+      if (pending) sendJob();
+    } else if (data.type === "unavailable") {
+      stopWorker({ unavailable: true });
+    } else if (pending && data.jobId === pending.id) completeJob(data);
+  };
+  worker.onerror = () => {
+    if (python?.worker === worker) stopWorker({ unavailable: true });
+  };
+  return python;
+}
+
+function sendJob() {
+  clearTimeout(pending.timer);
+  pending.timer = setTimeout(() => stopWorker({ timeout: true }), 8000);
+  python.worker.postMessage({ code: pending.code, check: pending.check, jobId: pending.id });
+}
+
+function runPython(code, check) {
+  return new Promise((resolve) => {
+    const interpreter = prepareWorker();
+    pending = { id: ++jobId, code, check, resolve, timer: setTimeout(() => stopWorker({ unavailable: true }), 25000) };
+    if (interpreter.ready) sendJob();
   });
-};
-
-document.getElementById("btn-gotowork").onclick = enterOffice;
-document.getElementById("btn-skip-intro").onclick = () => {
-  state = initialState();
-  enterOffice();
-};
-
-document.getElementById("btn-restart").onclick = () => {
-  state = initialState();
-  document.getElementById("paste-warning").classList.add("hidden");
-  document.getElementById("spr-park").style.display = "";
-  document.getElementById("spr-boss").classList.remove("away");
-  enterOffice();
-};
-
-function renderTitleBest() {
-  try {
-    if (localStorage.getItem("retro-intro-seen")) {
-      document.getElementById("btn-skip-intro").classList.remove("hidden");
-    }
-  } catch { /* 무시 */ }
-  const best = loadBest();
-  document.getElementById("title-best").textContent = best
-    ? `개인 최고 기록: ${best.score}점 — ${best.ending}`
-    : "";
 }
-renderTitleBest();
 
-const editor = document.getElementById("editor");
-editor.addEventListener("paste", onPasteAttempt);
-editor.addEventListener("drop", onPasteAttempt);
-editor.addEventListener("input", resetIdle);
-editor.addEventListener("keydown", (e) => {
-  if (e.key === "Tab") {
-    e.preventDefault();
-    const { selectionStart: s, selectionEnd: t, value } = editor;
-    editor.value = value.slice(0, s) + "    " + value.slice(t);
-    editor.selectionStart = editor.selectionEnd = s + 4;
+async function handlePython(submit) {
+  if (busy || (submit && !canSubmit(state))) return;
+  busy = true;
+  renderChoices();
+  renderCoding();
+  $("office-title").disabled = true;
+  output("Python 실행 중…");
+  const result = await runPython(editor.value, submit ? currentMission(state).check : null).catch(() => ({ unavailable: true }));
+  busy = false;
+  $("office-title").disabled = false;
+  if (result.unavailable) output("Python 실행기를 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 실행하세요.", "error");
+  else if (result.timeout) output("8초 동안 코드가 끝나지 않아 실행을 멈췄습니다. 반복문의 종료 조건을 확인하세요.", "error");
+  else if (!result.ok) output(result.error || "실행 오류가 발생했습니다.", "error");
+  else if (submit && !result.passed) output(`${result.stdout.trimEnd()}\n\n검수 실패. 출력과 변수, 그리고 경계값 조건을 다시 확인하세요.`.trimStart(), "error");
+  else output(result.stdout || "(출력 없음)", "ok");
+  if (submit && result.passed) {
+    submitSolution(state);
+    draft = null;
+    if (state.ending) return endRun();
+    renderOffice(true);
+    if (state.scope > 0 && state.phase === "morning") react("success");
+  } else {
+    renderChoices();
+    renderCoding();
+    if (result.timeout || (!result.ok && !result.unavailable)) react("error");
   }
+}
+
+function blockInsertion(event) {
+  event.preventDefault();
+  const count = recordPaste(state);
+  if (!count) return;
+  const line = PASTE_LINES[Math.min(count - 1, PASTE_LINES.length - 1)];
+  bossSay(line);
+  $("paste-warning").textContent = count === 3 ? `김 책임 · ${line}  [업적 달성]` : `김 책임 · ${line}`;
+  checkpoint();
+}
+
+editor.addEventListener("paste", blockInsertion);
+editor.addEventListener("dragover", (event) => event.preventDefault());
+editor.addEventListener("drop", blockInsertion);
+editor.addEventListener("beforeinput", (event) => {
+  if (["insertFromPaste", "insertFromPasteAsQuotation", "insertFromDrop"].includes(event.inputType)) blockInsertion(event);
+});
+editor.addEventListener("input", () => {
+  draft = { id: currentMission(state).id, code: editor.value };
+  checkpoint();
+  resetIdle();
+});
+editor.addEventListener("keydown", (e) => {
+  if (e.key === "Tab" && !e.shiftKey) {
+    e.preventDefault();
+    editor.setRangeText("    ", editor.selectionStart, editor.selectionEnd, "end");
+    editor.dispatchEvent(new Event("input"));
+  }
+  if (e.key === "Escape") $("btn-run").focus();
 });
 
-document.getElementById("btn-run").onclick = handleRun;
-document.getElementById("btn-submit").onclick = handleSubmit;
-document.getElementById("act-hint").onclick = doHint;
-document.getElementById("act-coffee").onclick = doCoffee;
-document.getElementById("act-flatter").onclick = doFlatter;
-document.getElementById("act-delegate").onclick = doDelegate;
-document.getElementById("act-negotiate").onclick = doNegotiate;
-document.getElementById("act-skip").onclick = doSkip;
-document.getElementById("act-overtime").onclick = doOvertime;
-document.getElementById("act-leave").onclick = doLeave;
+let lastRecord;
+let syncVersion = 0;
 
-createWorker(); // 페이지 로드 시 Pyodide 미리 준비
+function showResult(record) {
+  show("screen-ending");
+  const ending = ENDINGS[record.ending];
+  $("ending-title").textContent = ending.title;
+  $("ending-sub").textContent = "미래소프트™ 개발자 생활 결산표";
+  $("ending-desc").textContent = ending.text;
+  const rows = METRICS.map(([key, label, unit]) => [
+    label,
+    key === "completedDay"
+      ? record[key] === null ? "미완료" : `입사 ${record[key]}일차 · ${formatDate(record[key])}`
+      : `${record[key]}${unit}`,
+  ]);
+  rows.push(["완료한 코딩 미션", `${record.progress}/${MISSIONS.length}`]);
+  document.querySelector("#ending-table tbody").replaceChildren(...rows.map(([label, value]) => {
+    const row = document.createElement("tr");
+    const header = document.createElement("th");
+    const cell = document.createElement("td");
+    header.scope = "row";
+    header.textContent = label;
+    cell.textContent = value;
+    row.append(header, cell);
+    return row;
+  }));
+  replaceList($("ending-award"), record.achievements.map((title) => `업적 · ${title}`));
+  const best = loadLocal(BEST_KEY);
+  $("ending-best").textContent = best ? `이 브라우저 최단 완료 · ${best.completedDay}일차` : "";
+}
+
+function endRun() {
+  clearTimeout(idle);
+  bossVersion++;
+  saveLocal(RUN_KEY, null);
+  const record = recordFor(state);
+  lastRecord = record;
+  const best = loadLocal(BEST_KEY);
+  if (record.completedDay && (!best || record.completedDay < best.completedDay)) saveLocal(BEST_KEY, record);
+  $("ending-sync").textContent = "";
+  const version = ++syncVersion;
+  syncRecord(record, { ruleset: RULESET, id: state.id, seed: state.seed, moves: state.moves }).then((message) => {
+    if (version === syncVersion) $("ending-sync").textContent = message;
+  });
+  if (!ENDINGS[record.ending].cleared) return showResult(record);
+
+  $("chat-log-twist").replaceChildren();
+  $("buttons-twist").replaceChildren();
+  show("screen-twist");
+  runScript(EPILOGUE, "chat-log-twist", "buttons-twist", () => {
+    const end = document.createElement("p");
+    end.className = "credits-end";
+    end.textContent = "THE END";
+    const quote = document.createElement("p");
+    quote.className = "line dim";
+    quote.textContent = "코딩은 컴퓨터와 하는 일이지만, 개발은 사람과 하는 일이었다.";
+    const next = document.createElement("p");
+    next.className = "line dim";
+    next.textContent = "《최후의 개발자》에서 계속";
+    const button = document.createElement("button");
+    button.className = "btn primary";
+    button.textContent = "결산표 보기";
+    button.onclick = () => showResult(record);
+    $("buttons-twist").replaceChildren(end, quote, next, button);
+  });
+}
+
+function title() {
+  clearTimeout(idle);
+  bossVersion++;
+  show("screen-title");
+  const saved = loadLocal(RUN_KEY);
+  $("btn-resume").classList.toggle("hidden", !saved);
+  try {
+    $("btn-skip-intro").classList.toggle("hidden", !localStorage.getItem("retro-intro-seen"));
+  } catch { /* A restricted browser can still play the intro. */ }
+  const best = loadLocal(BEST_KEY);
+  const legacy = loadLocal("retro-best");
+  $("title-best").textContent = best ? `이 브라우저 최단 완료 · ${best.completedDay}일차`
+    : legacy ? `이전 10일판 최고 기록 · ${legacy.score}점 · ${legacy.ending}` : "";
+}
+
+$("btn-start").onclick = () => {
+  show("screen-intro");
+  $("chat-log").replaceChildren();
+  $("agent-term").textContent = "";
+  $("screen-intro").classList.remove("anger-1", "anger-2", "anger-3");
+  runScript(PROLOGUE_2026, "chat-log", "intro-buttons", startTravel, { onAnger: escalateAnger, termId: "agent-term" });
+};
+$("btn-gotowork").onclick = () => enterOffice();
+$("btn-skip-intro").onclick = () => enterOffice();
+$("btn-resume").onclick = () => enterOffice(true);
+$("btn-restart").onclick = () => enterOffice();
+$("office-title").onclick = title;
+$("ending-title-link").onclick = title;
+$("btn-run").onclick = () => handlePython(false);
+$("btn-submit").onclick = () => handlePython(true);
+
+$("title-records").onclick = () => openRecords(lastRecord, title);
+$("ending-records").onclick = () => openRecords(lastRecord, () => showResult(lastRecord));
+initRecords(show, (message) => { $("ending-sync").textContent = message; });
+title();

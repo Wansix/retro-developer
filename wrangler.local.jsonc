@@ -1,0 +1,13 @@
+{
+  "name": "retro-developer",
+  "pages_build_output_dir": ".wrangler/public",
+  "compatibility_date": "2026-11-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "RETRO_DB",
+      "database_name": "retro-developer-records",
+      "database_id": "a05fa4aa-61de-45c2-b4ac-a90b910e7f4d"
+    }
+  ]
+}

@@ -50,7 +50,7 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 /* ============ 프롤로그 채팅 ============ */
 .terminal.chat { max-width: 640px; }
 
-#chat-log, #chat-log-2006 {
+#chat-log, #chat-log-2006, #chat-log-twist {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -226,13 +226,6 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 .bar-fill { height: 100%; transition: width 0.4s ease; }
 .bar-fill.hp { background: #c05050; }
 .bar-fill.prog { background: #4a7a30; }
-.hud-item.flash { animation: hudflash 0.5s ease; }
-@keyframes hudflash {
-  0% { background: #e8e0c8; }
-  100% { background: transparent; }
-}
-#hud-ap { color: #3a5a24; letter-spacing: 0.1em; }
-
 /* 레이아웃 */
 #office-main {
   width: 100%;
@@ -241,9 +234,6 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   grid-template-columns: 340px 1fr;
   gap: 0.6rem;
   align-items: start;
-}
-@media (max-width: 900px) {
-  #office-main { grid-template-columns: 1fr; }
 }
 #left-col { display: flex; flex-direction: column; gap: 0.6rem; }
 
@@ -260,9 +250,9 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   padding: 0.2rem 0.5rem;
   border-top: 1px solid #2a3a24;
 }
-#spr-boss.away { display: none; }
 
-/* 김 과장 대화 */
+
+/* 김 책임 대화 */
 #boss-dialog {
   display: flex;
   gap: 0.6rem;
@@ -277,15 +267,6 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 #boss-face svg, #boss-face img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 #boss-text .speaker { font-weight: bold; font-size: 0.9rem; color: #5a4a1a; }
 #boss-text p { line-height: 1.6; margin-top: 0.2rem; font-size: 1.02rem; }
-#boss-dialog.talk { animation: bosspop 0.25s ease; }
-@keyframes bosspop {
-  0% { transform: scale(0.98); }
-  60% { transform: scale(1.01); }
-  100% { transform: scale(1); }
-}
-
-/* 행동 버튼 */
-#actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
 .act-btn {
   display: flex;
   flex-direction: column;
@@ -343,7 +324,7 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   padding: 0.4rem 0.5rem;
   font-size: 0.9rem;
 }
-.hint::before { content: "박 대리: "; font-weight: bold; }
+.hint::before { content: "박 선임: "; font-weight: bold; }
 
 .editor-head {
   display: flex;
@@ -385,103 +366,6 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
 #output.error { color: #d07070; }
 #output.ok { color: #8fd05a; }
 
-/* ============ 레트로 알림창 (Windows 2000 스타일) ============ */
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-.win {
-  width: 360px;
-  max-width: 92vw;
-  background: #cfc5a2;
-  border: 3px solid;
-  border-color: #e8e0c8 #4a4232 #4a4232 #e8e0c8;
-  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.4);
-  animation: pop 0.15s ease-out;
-}
-.win.wide { width: 460px; }
-.win-title {
-  background: #3a5a24;
-  color: #e8f0d8;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.85rem;
-  display: flex;
-  justify-content: space-between;
-}
-.win-x { cursor: default; opacity: 0.7; }
-.win-body { padding: 1rem; color: #3a3423; line-height: 1.6; white-space: pre-wrap; }
-.win-foot { padding: 0 1rem 1rem; text-align: right; }
-.w95-btn {
-  padding: 0.4rem 1.6rem;
-  background: #b8ab84;
-  border: 2px solid;
-  border-color: #e8e0c8 #6a5f3a #6a5f3a #e8e0c8;
-  font-family: inherit;
-  cursor: pointer;
-}
-.w95-btn:active { border-color: #6a5f3a #e8e0c8 #e8e0c8 #6a5f3a; }
-
-#cmp-table, #ending-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-#cmp-table th, #cmp-table td, #ending-table td {
-  border: 1px solid #8a7f5a;
-  padding: 0.35rem 0.6rem;
-  text-align: right;
-}
-#cmp-table th:first-child, #cmp-table td:first-child,
-#ending-table td:first-child { text-align: left; }
-#cmp-table thead th { background: #b8ab84; }
-.cmp-boss { margin-top: 0.8rem; color: #5a4a1a; font-weight: bold; }
-
-/* 엔딩 */
-#screen-ending .terminal { max-width: 560px; }
-#ending-title { color: #8fd05a; }
-#ending-table { margin: 1rem 0; color: #d8e0c8; }
-#ending-table td { border-color: #3a4a2e; }
-.award { color: #e8c860; font-weight: bold; min-height: 1.4em; }
-.best { color: #6a7a58; font-size: 0.85rem; margin-top: 0.5rem; }
-
-/* 반전 엔딩 */
-#twist-terminal.glitching { animation: glitch 0.2s steps(2) infinite; }
-#twist-syslog {
-  background: #000;
-  border: 1px solid #3a5a24;
-  color: #6fc040;
-  padding: 0.8rem;
-  margin: 0.8rem 0;
-  font-size: 0.85rem;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  text-shadow: 0 0 6px rgba(120, 220, 80, 0.5);
-}
-.achievement {
-  background: #2a2410;
-  border: 1px solid #e8c860;
-  color: #e8c860;
-  padding: 0.6rem 0.8rem;
-  margin: 0.8rem 0;
-  text-align: center;
-  animation: pop 0.3s ease-out;
-}
-
-/* 크레딧 */
-#screen-credits { background: #000; }
-.credits { text-align: center; max-width: 480px; }
-.credits-head { color: #6a7a58; font-size: 1rem; letter-spacing: 0.3em; margin-bottom: 1.5rem; }
-#credits-list { list-style: none; margin-bottom: 2rem; }
-#credits-list li { color: #9fd070; line-height: 2.2; animation: pop 0.4s ease-out both; }
-#credits-list li:last-child { color: #e8c860; font-weight: bold; }
-.credits-final { color: #d8e0c8; line-height: 1.8; margin-bottom: 1.5rem; }
-.credits-end { color: #8fd05a; font-size: 1.6rem; letter-spacing: 0.4em; margin-bottom: 1rem; }
-
 /* AI 생성 대사 표시 (테스트용) */
 .ai-tag {
   display: inline-block;
@@ -493,4 +377,118 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   border: 1px solid #e8c860;
   border-radius: 3px;
   opacity: 0.85;
+}
+
+:root { color-scheme: dark; }
+body { background: radial-gradient(ellipse at top, #253322 0, #151e14 46rem); }
+button, input, select, textarea { font: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+  outline: 3px solid #b8e888;
+  outline-offset: 2px;
+}
+
+#screen-title .terminal { padding: clamp(1.25rem, 5vw, 3rem); }
+#screen-title h1 { font-size: clamp(2.1rem, 6vw, 3.4rem); }
+#screen-office.active { padding: clamp(.65rem, 2vw, 1.5rem); gap: .8rem; }
+#hud { column-gap: 1.15rem; row-gap: .55rem; }
+#office-title { margin-left: auto; padding: .3rem .75rem; }
+#office-main { gap: .8rem; grid-template-columns: minmax(220px, 285px) minmax(0, 1fr); }
+#left-col { gap: .7rem; }
+#scene-caption { color: #a8b890; padding: .4rem .55rem; }
+#boss-line, #shift-story { overflow-wrap: anywhere; }
+
+#relation-panel, #schedule {
+  background: #10190e;
+  border: 1px solid #4a5d3a;
+  padding: .75rem .85rem;
+}
+#relation-panel summary, #mission-help summary, #history-list summary { cursor: pointer; }
+#relation-panel p { color: #a8b890; margin: .65rem 0; font-size: .85rem; }
+#relations, #history-list dl { display: grid; grid-template-columns: 1fr auto; gap: .35rem 1rem; }
+#relations dd, #history-list dd { text-align: right; color: #b8e888; }
+#schedule { list-style: none; padding: .4rem; color: #abbca1; }
+#schedule li { padding: .42rem .5rem; font-size: .87rem; }
+#schedule [aria-current] {
+  background: #314523;
+  border-left: 3px solid #adce79;
+  color: #f4f6eb;
+  font-weight: bold;
+}
+
+#work-panel { min-width: 0; padding: .85rem; gap: .8rem; }
+#shift-panel {
+  background: #cfc5a2;
+  border: 2px solid #8a7f5a;
+  color: #2e2a1c;
+  padding: clamp(.9rem, 3vw, 1.4rem);
+}
+#shift-title { color: #263d1c; font-size: clamp(1.3rem, 3vw, 1.9rem); }
+#shift-title:focus { outline: none; }
+.phase-clock { color: #4d472d; font-weight: bold; margin-bottom: .35rem; }
+#shift-story { white-space: pre-line; line-height: 1.7; }
+#shift-effects { padding-inline-start: 1.25rem; margin-top: .8rem; line-height: 1.6; }
+#shift-effects:empty { display: none; }
+
+#choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
+#choices .act-btn { min-height: 44px; justify-content: center; line-height: 1.4; }
+#coding-panel { display: grid; gap: .55rem; min-width: 0; }
+#mission-help { margin: .6rem 0; }
+#mission-help > summary { padding-block: .3rem; font-weight: bold; }
+#mission-help .grammar { margin-top: .3rem; }
+#mission-panel pre { overflow-wrap: anywhere; }
+.expect code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.editor-head { color: #a8b890; flex-wrap: wrap; gap: .2rem .6rem; }
+#editor { min-height: 155px; font-size: .95rem; }
+#output { min-height: 55px; }
+
+#screen-ending .terminal { max-width: 620px; }
+#ending-table { width: 100%; border-collapse: collapse; margin-block: 1rem; color: #d8e0c8; }
+#ending-table th, #ending-table td { border-bottom: 1px solid #3a4a2e; padding: .55rem .4rem; }
+#ending-table th { font-weight: normal; text-align: left; }
+#ending-table td { text-align: right; }
+.award { color: #e8c860; list-style-position: inside; line-height: 1.55; }
+.best { color: #a7b69a; font-size: .85rem; margin-top: .7rem; }
+.credits-end { color: #b8e888; font-size: 1.45rem; letter-spacing: .15em; }
+
+#account-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .65rem;
+  margin-block: .7rem 1.25rem;
+}
+#account-form label { display: grid; gap: .3rem; }
+#account-form p { grid-column: 1 / -1; font-size: .85rem; }
+#account-form .btn { margin-top: 0; }
+#account-form input, #rank-category {
+  width: 100%;
+  min-width: 0;
+  padding: .55rem;
+  background: #080d07;
+  border: 1px solid #6a7a58;
+  border-radius: 0;
+  color: #e2e8d2;
+}
+.record-category { display: flex; align-items: center; gap: .6rem; }
+#rank-category { width: auto; max-width: 100%; }
+.record-actions, #history-panel { margin-block: .8rem; }
+#rank-list, #history-list { padding-top: .65rem; color: #d8e0c8; }
+#rank-list ol { list-style: none; }
+#rank-list li { display: flex; justify-content: space-between; gap: 1rem; padding: .55rem 0; border-bottom: 1px solid #3a4a2e; }
+#history-list details { border: 1px solid #3a4a2e; padding: .55rem; margin-bottom: .45rem; }
+#history-list dl { margin-top: .6rem; font-size: .9rem; }
+
+@media (max-width: 740px) {
+  #office-main { grid-template-columns: minmax(0, 1fr); }
+  #work-panel { grid-row: 1; }
+  #schedule { display: none; }
+  #office-title { margin-left: 0; }
+  .terminal { padding: clamp(1rem, 5vw, 2rem); }
+}
+@media (max-width: 390px) {
+  #choices .act-btn:not(.ticket-choice) { grid-column: 1 / -1; }
+  #account-form { grid-template-columns: 1fr; }
+  #ending-table { font-size: .9rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }

@@ -1,5 +1,5 @@
 // 미션 데이터 (기획서 §3). check.type: 'output' = 전체 출력 비교, 'var' = 마지막 출력값 비교.
-const MISSIONS = [
+export const MISSIONS = [
   {
     id: "hello-world",
     title: "업무 1. 첫인사 출력",
@@ -20,13 +20,13 @@ const MISSIONS = [
     boss: "사장님 월급이 10만 원 올랐대. salary에 100000을 더해서 3100000이 나오게 해.",
     brief: "salary 변수에 100000을 더해 3,100,000을 만들어야 한다.",
     grammar: "변수에 값을 더해 다시 저장하려면 salary += 100000 또는 salary = salary + 100000 을 쓴다.",
-    example: "money = 5000\nmoney += 500",
+    example: "money = 5000\nmoney += 500\nprint(money)",
     exampleOut: "5500",
     requirement: "salary가 3100000이 되도록 코드를 완성하세요.",
     starter: "salary = 3000000\n# salary에 100000을 더하세요\n\nprint(salary)\n",
     expectedOut: "3100000",
     hint: "salary += 100000 한 줄이면 됩니다.",
-    check: { type: "var", name: "salary", expected: "3100000" },
+    check: { type: "var", name: "salary", expected: 3100000 },
   },
   {
     id: "star-print",
@@ -68,12 +68,12 @@ const MISSIONS = [
     starter: "prices = [1000, 2000, 3000]\ntotal = 0\n# prices의 합계를 total에 저장하세요\n\nprint(total)\n",
     expectedOut: "6000",
     hint: "total = sum(prices) 한 줄로 끝납니다.",
-    check: { type: "var", name: "total", expected: "6000" },
+    check: { type: "var", name: "total", expected: 6000 },
   },
   {
     id: "signup-check",
-    title: "최종 검수 — 회원가입",
-    boss: "마지막이다. 회원가입에서 19세 이상만 가입되게 해. 이것만 되면 프로젝트 끝이야.",
+    title: "업무 6. 회원가입 나이 제한",
+    boss: "회원가입에서 19세 이상만 가입되게 해. 영업팀은 이미 된다고 했어.",
     brief: "나이가 19세 이상이면 allowed가 True가 되어야 한다.",
     grammar: "조건이 참인지 비교하려면 >= 를 쓴다. age >= 19 는 19세 이상일 때 True다.",
     example: "is_adult = age >= 20",
@@ -82,27 +82,99 @@ const MISSIONS = [
     starter: "age = 20\nallowed = False\n# 19세 이상이면 allowed가 True가 되게 하세요\n\nprint(allowed)\n",
     expectedOut: "True",
     hint: "allowed = age >= 19 입니다. 18세면 False, 19세면 True가 되는지도 생각해 보세요.",
-    check: { type: "var", name: "allowed", expected: "True" },
+    check: { type: "var", name: "allowed", expected: true, cases: [{ variable: "age", input: 18, expected: false }, { variable: "age", input: 19, expected: true }] },
+  },
+  {
+    id: "button-color",
+    title: "업무 7. 버튼 색상 하나만",
+    boss: "파란색으로 바꾸면 끝이야. 어느 파일인지는 디자인팀에 물어봐.",
+    brief: "승인된 버튼만 파란색으로 표시한다.",
+    grammar: "if 뒤의 조건이 참이면 들여쓰기한 줄이 실행된다. else는 조건이 거짓일 때 실행된다.",
+    example: 'if approved:\n    color = "blue"\nelse:\n    color = "gray"',
+    requirement: "approved가 참이면 color를 blue, 거짓이면 gray로 설정하세요.",
+    starter: 'approved = True\ncolor = "gray"\n# 승인 상태에 따라 color를 변경하세요\n\nprint(color)\n',
+    expectedOut: "blue",
+    hint: 'if approved: 다음 줄을 들여쓰기하고 color = "blue"를 쓰세요.',
+    check: { type: "var", name: "color", expected: "blue", cases: [{ variable: "approved", input: false, expected: "gray" }] },
+  },
+  {
+    id: "ie-fallback",
+    title: "업무 8. IE6 전용 화면",
+    boss: "고객사 컴퓨터는 전부 IE6래. 아직 나온 지 5년밖에 안 됐잖아.",
+    brief: "브라우저 이름에 따라 classic 또는 modern 테마를 돌려준다.",
+    grammar: "def로 함수를 만들고 return으로 호출한 곳에 값을 돌려준다.",
+    example: 'def greeting(name):\n    return "안녕 " + name\nprint(greeting("신입"))',
+    exampleOut: "안녕 신입",
+    requirement: "theme(browser)를 완성하세요. IE6은 classic, 그 외에는 modern입니다.",
+    starter: 'def theme(browser):\n    pass\n\nprint(theme("IE6"))\n',
+    expectedOut: "classic",
+    hint: 'browser == "IE6"인지 비교하고, 참이면 "classic", 아니면 "modern"을 return 하세요.',
+    check: { type: "function", name: "theme", args: [["IE6"], ["Firefox"], ["Opera"]], expected: ["classic", "modern", "modern"] },
+  },
+  {
+    id: "inventory",
+    title: "업무 9. 유령 재고 집계",
+    boss: "매진된 상품이 다섯 개나 판매 중이래. 재고가 0보다 큰 것만 세.",
+    brief: "재고 목록에서 판매 가능한 상품 종류를 센다.",
+    grammar: "for로 목록의 값을 하나씩 읽고, 조건에 맞을 때만 숫자를 더한다.",
+    example: "for item in stock:\n    if item > 0:\n        count += 1",
+    requirement: "stock에서 재고가 0보다 큰 항목 수를 count에 저장하세요.",
+    starter: "stock = [0, 4, 2, 0, 8]\ncount = 0\n# 반복문으로 판매 가능한 상품을 세세요\n\nprint(count)\n",
+    expectedOut: "3",
+    hint: "for 안의 if 블록에서만 count += 1을 실행하세요.",
+    check: { type: "var", name: "count", expected: 3, cases: [{ variable: "stock", input: [0, 1, 2, 3, 4], expected: 4 }] },
+  },
+  {
+    id: "shipping",
+    title: "업무 10. 무료배송의 조건",
+    boss: "5만 원 이상 무료라고 했지, 5만 원 초과라고 메일 보냈어?",
+    brief: "주문 금액에 따른 배송비를 반환하는 함수를 완성한다.",
+    grammar: "정확히 기준값과 같은 주문도 포함하려면 >=를 사용한다.",
+    example: "def price_for(amount):\n    if amount >= 100:\n        return 0\n    return 5",
+    requirement: "shipping(total)은 50000 이상이면 0, 그보다 적으면 2500을 반환해야 합니다.",
+    starter: "def shipping(total):\n    if total > 50000:\n        return 0\n    return 2500\n\nprint(shipping(50000))\n",
+    expectedOut: "0",
+    hint: "비교 연산자 >를 >=로 바꿔보세요.",
+    check: { type: "function", name: "shipping", args: [[50000], [49999], [90000]], expected: [0, 2500, 0] },
+  },
+  {
+    id: "mail-list",
+    title: "업무 11. 수신 거부 명단",
+    boss: "수신 거부 고객에게 감사 메일을 보냈대. 이번엔 거부 고객 빼고 보내.",
+    brief: "동의한 고객의 이름만 입력 순서대로 출력한다.",
+    grammar: "for name, agreed in customers:처럼 목록의 각 쌍을 두 변수에 나눠 담을 수 있다.",
+    example: "for name, agreed in customers:\n    if agreed:\n        print(name)",
+    requirement: "동의한 고객 이름만 한 줄에 하나씩 출력하세요.",
+    starter: 'customers = [("이솜", True), ("김늘", False), ("박별", True)]\n# 동의한 고객 이름만 출력하세요\n',
+    expectedOut: "이솜\n박별",
+    hint: "for와 if를 차례로 쓰고 if 안에 print(name)을 넣으세요.",
+    check: { type: "output", expected: "이솜\n박별" },
+  },
+  {
+    id: "deployment",
+    title: "업무 12. 배포 전 마지막 한 줄",
+    boss: "실패가 하나라도 있으면 배포 중지. 그 문구를 QA한테는 내가 말할게.",
+    brief: "테스트 결과 목록에 실패가 있는지 확인한다.",
+    grammar: "all(values)는 모든 원소가 참일 때 True를 반환한다.",
+    example: "print(all([True, False]))",
+    exampleOut: "False",
+    requirement: "ready(results)가 모두 참이면 DEPLOY, 그 외에는 HOLD를 반환하게 하세요.",
+    starter: 'def ready(results):\n    pass\n\nprint(ready([True, False]))\n',
+    expectedOut: "HOLD",
+    hint: 'if all(results): 에서 "DEPLOY"를 반환하고, 그 외에는 "HOLD"를 반환하세요.',
+    check: { type: "function", name: "ready", args: [[[true, false]], [[true, true]], [[false, false]]], expected: ["HOLD", "DEPLOY", "HOLD"] },
   },
 ];
-
-// 김 과장 상황별 대사 (기획서 §4)
-const BOSS_LINES = {
-  idle: "신입, 이거 아직도 하고 있어?",
-  error: "빨간 글씨 뜨는데? 잘되고 있는 거야?",
-  wrong: "음... 이게 맞아? 다시 확인해 보게.",
-  success: "오! 벌써 끝났어? 그럼 이것도 해줘.",
-  hint: "둘이서 하면 두 배로 빨리 끝나겠네?",
-  coffee: "커피 마실 시간은 있나 봐?",
-  flatter: "하하, 신입이 눈치는 있네.",
-  delegate: "동료랑 나눠 하라고 했지, 통째로 넘기라고 했나?",
+// 김 책임 상황별 대사 (기획서 §4)
+export const BOSS_LINES = {
+  idle: "신입, 막히면 이 선임한테 먼저 물어봐. 나는 고객사 전화 좀 받고.",
+  error: "빨간 글씨 뜨는데? 지금 QA한테 보여주면 안 되는 거지?",
+  success: "오, 끝났어? 단체 메일에는 내일 아침에 올리자.",
+  coffee: "내 것도 한 잔 부탁해. 정 수석은 아직 회의 중이야.",
   leave: "오늘 집에 무슨 일 있어?",
-  morningAfter: "어제 무슨 일 있었어? 왜 그렇게 일찍 갔어?",
-  negotiate: "일정이 왜 필요하지? 일이나 해.",
-  skip: "흠, 이건 내가 알아서 처리하지. 자네는 다음 거나 해.",
 };
 
-const PASTE_LINES = [
+export const PASTE_LINES = [
   "신입, 한 글자도 안 치고 코드를 완성했다고?",
   "자네 Ctrl+V 말고 다른 키는 없나?",
   "혹시 미래에서 왔어?",
@@ -110,7 +182,7 @@ const PASTE_LINES = [
 
 // 프롤로그 2026년: who 'me'는 플레이어가 직접 누르는 대사 버튼, 'ai'는 자동 진행.
 // logs는 해당 시점에 위쪽 에이전트 터미널에 타이핑되는 작업 로그.
-const PROLOGUE_2026 = [
+export const PROLOGUE_2026 = [
   { who: "me", text: "야, 로그인 버그 좀 고쳐." },
   { who: "ai", text: "수정 완료했습니다. 테스트 12개를 통과했습니다.",
     logs: ["> 로그인 모듈 분석 중...", "> 관련 파일 3개 수정...", "> 테스트 12개 실행... 12 passed ✓"] },
@@ -134,15 +206,15 @@ const PROLOGUE_2026 = [
   { who: "me", text: "뭐?" },
 ];
 
-const TRAVEL_LINES = [
+export const TRAVEL_LINES = [
   "Initializing development environment...",
   "AI Assistant: DISABLED",
   "Target Year: 2006",
   "Time Travel: COMPLETE",
 ];
 
-// 2006년 첫 출근: boss = 김 과장, ai = 모니터에 뜬 미래의 AI 메시지.
-const SCENE_2006 = [
+// 2006년 첫 출근: boss = 김 책임, ai = 모니터에 뜬 미래의 AI 메시지.
+export const SCENE_2006 = [
   { who: "boss", text: "신입! 첫날부터 졸고 있어?" },
   { who: "me", text: "……누구세요?" },
   { who: "boss", text: "오늘부터 쇼핑몰 프로젝트 들어갈 거야." },
@@ -150,50 +222,8 @@ const SCENE_2006 = [
   { who: "boss", text: "그냥 깔끔하고 세련되게. 알아서 잘 만들어 봐." },
   { who: "me", text: "……." },
   { who: "ai", text: "요청하신 대로 AI 코딩 에이전트가 없던 시대로 이동하셨습니다." },
-  { who: "ai", text: "10일 안에 프로젝트를 완성하시면 원래 시대로 돌아갈 수 있습니다." },
+  { who: "ai", text: "30일 안에 프로젝트를 완성하시면 원래 시대로 돌아갈 수 있습니다." },
   { who: "ai", text: "코딩 지원은 제공되지 않습니다." },
   { who: "ai", text: "행운을 빕니다. 인간 개발자님." },
   { who: "me", text: "아니 잠깐만!!!" },
-];
-
-// 반전 엔딩 (기획서 Phase 3.5) — 고정 대사. stats는 실제 플레이 기록.
-const TWIST_BEFORE = [
-  { who: "boss", text: "신입, 그동안 고생 많았다." },
-  { who: "me", text: "과장님도 건강하세요. 제발 후배들한테 좀 잘해주시고요." },
-  { who: "boss", text: "그래. 자네 같은 개발자는 처음이었어." },
-];
-
-function twistSystemLog(stats) {
-  return [
-    "[SIMULATION COMPLETE]",
-    "",
-    "Agent: KIM_MANAGER",
-    "Role: 2006년 중소기업 개발팀 과장",
-    "Personality: 권위적, 모호한 업무 지시",
-    "Objective: 신입 개발자의 업무 처리량 극대화",
-    "",
-    `Generated dialogues: ${stats.bossLines}`,
-    `Additional tasks assigned: ${stats.tasks}`,
-    "",
-    "Shutting down agent...",
-  ];
-}
-
-const TWIST_AFTER = [
-  { who: "me", text: "……잠깐. 김 과장도 AI였어?" },
-  { who: "ai", text: "네. 당시의 직장 문화를 재현하기 위해 설계된 AI 에이전트입니다." },
-  { who: "me", text: "그럼 내가 열흘 동안 AI한테 갈굼당하면서 코딩한 거야?" },
-  { who: "ai", text: "정확합니다." },
-  { who: "me", text: "야 이 개XX야!!!" },
-];
-
-const TWIST_ACHIEVEMENT = "[업적 달성: AI에게서 도망쳐 AI의 부하가 되었습니다.]";
-
-const CREDITS = [
-  "김 과장 역: AI",
-  "박 대리 역: AI",
-  "최 사원 역: AI",
-  "고객사 담당자 역: AI",
-  "업무 배정 및 일정 관리: AI",
-  "실제 코딩 및 야근 담당: 플레이어",
 ];

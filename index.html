@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>옛날 개발자 — 퇴근하고 싶다</title>
-<link rel="stylesheet" href="src/style.css?v=2">
+<link rel="stylesheet" href="src/style.css?v=3">
 </head>
 <body>
 
@@ -12,10 +12,12 @@
   <section id="screen-title" class="screen active">
     <div class="terminal">
       <h1>《옛날 개발자》</h1>
-      <p class="sub">퇴근하고 싶다 — 코딩은 입문 난이도, 직장생활은 하드코어</p>
+      <p class="sub">코딩은 쉬운데 퇴근이 어려운 게임.</p>
       <p class="line">2026년, 어느 개발자의 퇴근 2분 전.</p>
       <button id="btn-start" class="btn">게임 시작</button>
       <button id="btn-skip-intro" class="btn hidden">인트로 스킵하고 바로 출근</button>
+      <button id="btn-resume" class="btn primary hidden">이어 하기</button>
+      <button id="title-records" class="btn">계정·랭킹</button>
       <p id="title-best" class="best"></p>
     </div>
   </section>
@@ -53,31 +55,28 @@
   <section id="screen-titlecard" class="screen">
     <div class="titlecard">
       <h1 class="bigtitle">옛날 개발자</h1>
-      <p class="tagline">옛날 개발자는 이렇게 일했다!</p>
-      <p class="tagline2">코딩은 입문 난이도, 직장생활은 하드코어.</p>
+      <p class="tagline">미래소프트™ 개발 3팀</p>
+      <p class="tagline2">코딩은 쉬운데 퇴근이 어려운 게임.</p>
       <button id="btn-gotowork" class="btn primary">첫 출근하기</button>
     </div>
   </section>
 
-  <!-- 메인 게임 -->
   <section id="screen-office" class="screen">
-    <!-- 상단 HUD -->
     <header id="hud">
-      <div class="hud-item"><span class="hud-label">날짜</span><span id="hud-date">입사 1일차 09:00</span></div>
-      <div class="hud-item"><span class="hud-label">마감</span><span id="hud-dday">D-10</span></div>
-      <div class="hud-item gauge"><span class="hud-label">첼력</span>
-        <div class="bar"><div id="bar-hp" class="bar-fill hp"></div></div><span id="hud-hp" class="hud-val">100</span>
+      <div class="hud-item"><span class="hud-label">입사</span><span id="hud-date"></span></div>
+      <div class="hud-item"><span class="hud-label">마감</span><span id="hud-dday"></span></div>
+      <div class="hud-item gauge"><span class="hud-label">체력</span>
+        <div class="bar" aria-hidden="true"><div id="bar-hp" class="bar-fill hp"></div></div><span id="hud-hp" class="hud-val"></span>
       </div>
-      <div class="hud-item gauge"><span class="hud-label">진행</span>
-        <div class="bar"><div id="bar-progress" class="bar-fill prog"></div></div><span id="hud-progress" class="hud-val">0/6</span>
+      <div class="hud-item gauge"><span class="hud-label">기능</span>
+        <div class="bar" aria-hidden="true"><div id="bar-progress" class="bar-fill prog"></div></div><span id="hud-progress" class="hud-val"></span>
       </div>
-      <div class="hud-item"><span class="hud-label">코딩 Lv</span><span id="hud-level">1</span></div>
-      <div class="hud-item"><span class="hud-label">인사평가</span><span id="hud-score">0</span></div>
-      <div class="hud-item"><span class="hud-label">행동력</span><span id="hud-ap">■■■</span></div>
+      <div class="hud-item"><span class="hud-label">추가 일감</span><span id="hud-scope"></span></div>
+      <div class="hud-item"><span class="hud-label">인사평가</span><span id="hud-score"></span></div>
+      <button id="office-title" class="act-btn" type="button">타이틀</button>
     </header>
 
     <div id="office-main">
-      <!-- 왼쪽: 사무실 + 김 과장 + 행동 -->
       <aside id="left-col">
         <div id="office-scene">
           <svg id="scene-svg" viewBox="0 0 320 120" shape-rendering="crispEdges" aria-label="미래소프트 사무실">
@@ -91,26 +90,26 @@
             <rect x="150" y="14" width="16" height="16" fill="#e8e0c8"/>
             <rect x="157" y="17" width="2" height="6" fill="#3a3423"/>
             <rect x="157" y="21" width="5" height="2" fill="#3a3423"/>
-            <!-- 박 대리 책상 (왼쪽) -->
+            <!-- 박 선임 책상 (왼쪽) -->
             <rect x="8" y="70" width="60" height="6" fill="#8a7f5a"/>
             <rect x="12" y="76" width="4" height="14" fill="#6a5f3a"/>
             <rect x="60" y="76" width="4" height="14" fill="#6a5f3a"/>
             <rect x="28" y="56" width="20" height="14" fill="#3a4a3a"/>
             <rect x="31" y="59" width="14" height="8" fill="#6fc040"/>
-            <!-- 박 대리 -->
+            <!-- 박 선임 -->
             <g id="spr-park">
               <rect x="46" y="46" width="10" height="10" fill="#e0b890"/>
               <rect x="46" y="44" width="10" height="4" fill="#3a3423"/>
               <rect x="45" y="56" width="12" height="14" fill="#7a6a4a"/>
             </g>
-            <!-- 최 사원 책상 -->
+            <!-- 이 선임 책상 -->
             <rect x="90" y="70" width="60" height="6" fill="#8a7f5a"/>
             <rect x="94" y="76" width="4" height="14" fill="#6a5f3a"/>
             <rect x="142" y="76" width="4" height="14" fill="#6a5f3a"/>
             <rect x="110" y="56" width="20" height="14" fill="#3a4a3a"/>
             <rect x="113" y="59" width="14" height="8" fill="#6fc040"/>
-            <!-- 최 사원 -->
-            <g id="spr-choi">
+            <!-- 이 선임 -->
+            <g id="spr-lee">
               <rect x="128" y="46" width="10" height="10" fill="#e0b890"/>
               <rect x="128" y="44" width="10" height="4" fill="#1a1a1a"/>
               <rect x="127" y="56" width="12" height="14" fill="#4a5a7a"/>
@@ -129,121 +128,109 @@
               <rect x="226" y="42" width="10" height="4" fill="#2a2a1a"/>
               <rect x="225" y="54" width="12" height="16" fill="#5a6a3a"/>
             </g>
-            <!-- 김 과장 (주인공 뒤) -->
+            <!-- 김 책임 (주인공 뒤) -->
             <image id="spr-boss" href="src/assets/kim-manager.svg" x="256" y="32" width="32" height="36"/>
           </svg>
           <div id="scene-caption">미래소프트™ 개발 3팀</div>
         </div>
-
-        <div id="boss-dialog">
-          <div id="boss-face">
-            <img src="src/assets/kim-manager.svg" alt="김 과장">
-          </div>
-          <div id="boss-text">
-            <span class="speaker">김 과장</span>
-            <p id="boss-line">신입, 오늘부터 일 시작하지.</p>
-          </div>
+        <div id="boss-dialog" aria-live="polite">
+          <div id="boss-face"><img src="src/assets/kim-manager.svg" alt=""></div>
+          <div id="boss-text"><span class="speaker">김 책임</span><p id="boss-line"></p></div>
         </div>
-
-        <div id="actions">
-          <button class="act-btn" id="act-hint">동료 찬스 <span class="cost">행동력 1 · 힌트</span></button>
-          <button class="act-btn" id="act-coffee">커피 마시기 <span class="cost">행동력 1 · 첼력 +15</span></button>
-          <button class="act-btn" id="act-flatter">과장님께 아부 <span class="cost">행동력 1 · 평가 +45</span></button>
-          <button class="act-btn" id="act-delegate">업무 위임 <span class="cost">행동력 2 · 진행 +1</span></button>
-          <button class="act-btn" id="act-negotiate">일정 협상 <span class="cost">행동력 1</span></button>
-          <button class="act-btn" id="act-skip">포기하고 넘어가기 <span class="cost">비용 없음 · 점수 없음</span></button>
-          <button class="act-btn" id="act-overtime">야근하기 <span class="cost">행동력 +2 · 첼력 −25</span></button>
-          <button class="act-btn" id="act-leave">퇴근하기 <span class="cost">다음 날 · 첼력 +20</span></button>
-        </div>
+        <details id="relation-panel">
+          <summary>팀원과 부서 관계</summary>
+          <p>사원 → 선임 → 책임 → 수석</p>
+          <dl id="relations"></dl>
+        </details>
+        <ol id="schedule" aria-label="오늘 일정"></ol>
       </aside>
 
-      <!-- 오른쪽: 미션 + 에디터 -->
-      <div id="work-panel">
-        <div id="mission-panel">
-          <h2 id="mission-title"></h2>
-          <p id="mission-brief"></p>
-          <p id="mission-grammar" class="grammar"></p>
-          <pre id="mission-example" class="example"></pre>
-          <pre id="mission-example-out" class="example out"></pre>
-          <p id="mission-req" class="req"></p>
-          <p class="expect">기대 결과: <code id="mission-expected"></code></p>
-          <p id="hint-box" class="hint hidden"></p>
-        </div>
-        <div class="editor-head">
-          <span>main.py</span>
-          <span id="paste-warning" class="warn hidden"></span>
-        </div>
-        <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-        <div class="actions">
-          <button id="btn-run" class="btn">실행</button>
-          <button id="btn-submit" class="btn primary">업무 제출</button>
-        </div>
-        <div class="editor-head"><span>실행 결과</span></div>
-        <pre id="output">실행 버튼을 눌러 결과를 확인하세요.</pre>
-      </div>
+      <main id="work-panel">
+        <section id="shift-panel" aria-labelledby="shift-title">
+          <p id="shift-clock" class="phase-clock"></p>
+          <h1 id="shift-title" tabindex="-1"></h1>
+          <p id="shift-story"></p>
+          <ul id="shift-effects" aria-live="polite"></ul>
+        </section>
+        <div id="choices"></div>
+        <section id="coding-panel" class="hidden" aria-labelledby="mission-title">
+          <div id="mission-panel">
+            <h2 id="mission-title"></h2>
+            <p id="mission-brief"></p>
+            <p id="mission-req" class="req"></p>
+            <details id="mission-help">
+              <summary>문법과 예시</summary>
+              <p id="mission-grammar" class="grammar"></p>
+              <pre id="mission-example" class="example"></pre>
+              <pre id="mission-example-out" class="example out"></pre>
+              <p id="hint-box" class="hint"></p>
+            </details>
+            <p class="expect">기대 결과 <code id="mission-expected"></code></p>
+          </div>
+          <div class="editor-head">
+            <label for="editor">main.py</label>
+            <span id="paste-warning" class="warn" role="status"></span>
+          </div>
+          <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+          <div class="actions">
+            <button id="btn-run" class="btn">실행</button>
+            <button id="btn-submit" class="btn primary">업무 제출</button>
+          </div>
+          <div class="editor-head"><span>실행 결과</span></div>
+          <pre id="output" role="status"></pre>
+        </section>
+      </main>
     </div>
   </section>
 
-  <!-- 레트로 시스템 알림창 -->
-  <div id="modal-event" class="modal hidden">
-    <div class="win">
-      <div class="win-title"><span id="event-title">알림</span><span class="win-x">×</span></div>
-      <div class="win-body"><p id="event-body"></p></div>
-      <div class="win-foot"><button id="event-ok" class="w95-btn">확인</button></div>
-    </div>
-  </div>
-
-  <!-- 일일 인사평가 비교 -->
-  <div id="modal-compare" class="modal hidden">
-    <div class="win wide">
-      <div class="win-title"><span>일일 인사평가 — 입사 <span id="cmp-day"></span>일차</span></div>
-      <div class="win-body">
-        <table id="cmp-table">
-          <thead><tr><th>평가 항목</th><th>나</th><th>최 사원</th></tr></thead>
-          <tbody></tbody>
-        </table>
-        <p id="cmp-boss" class="cmp-boss"></p>
-      </div>
-      <div class="win-foot"><button id="cmp-ok" class="w95-btn">내일도 출근</button></div>
-    </div>
-  </div>
-
-  <!-- 반전 엔딩 -->
   <section id="screen-twist" class="screen">
-    <div class="terminal chat retro" id="twist-terminal">
-      <p class="line dim">2026년으로 돌아가기 직전 — 미래소프트™</p>
+    <div class="terminal chat">
+      <p class="line dim">2026년, 돌아온 자리</p>
       <div id="chat-log-twist"></div>
-      <pre id="twist-syslog" class="hidden"></pre>
-      <p id="twist-achievement" class="achievement hidden"></p>
       <div id="buttons-twist"></div>
     </div>
   </section>
 
-  <!-- 엔딩 크레딧 -->
-  <section id="screen-credits" class="screen">
-    <div class="credits">
-      <h2 class="credits-head">엔딩 크레딧</h2>
-      <ul id="credits-list"></ul>
-      <p class="credits-final">"이 게임에서 유일하게 직접 일한 존재는 당신이었습니다."</p>
-      <p class="credits-end">THE END</p>
-      <button id="btn-credits-ok" class="btn primary">결과 보기</button>
-    </div>
-  </section>
-
-  <!-- 엔딩 -->
   <section id="screen-ending" class="screen">
     <div class="terminal">
-      <p class="line dim" id="ending-sub">인사평가 결과</p>
+      <p id="ending-sub" class="line dim"></p>
       <h1 id="ending-title"></h1>
-      <p class="sub" id="ending-desc"></p>
+      <p id="ending-desc" class="sub"></p>
       <table id="ending-table"><tbody></tbody></table>
-      <p id="ending-award" class="award"></p>
+      <ul id="ending-award" class="award"></ul>
       <p id="ending-best" class="best"></p>
+      <p id="ending-sync" class="line dim" role="status"></p>
+      <button id="ending-records" class="btn">계정·랭킹</button>
       <button id="btn-restart" class="btn primary">다시 입사하기</button>
+      <button id="ending-title-link" class="btn">타이틀</button>
     </div>
   </section>
 
-  <script src="src/missions.js?v=2"></script>
-  <script src="src/main.js?v=2"></script>
+  <section id="screen-records" class="screen">
+    <div class="terminal">
+      <h1>개발자 기록실</h1>
+      <p id="account-status" class="line dim" role="status"></p>
+      <form id="account-form">
+        <label>계정 이름 <input id="handle" name="username" autocomplete="username" minlength="3" maxlength="20" required></label>
+        <label>비밀번호 <input id="password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required></label>
+        <p class="dim">계정 이름은 한글·영문·숫자·밑줄 3~20자, 비밀번호는 12자 이상입니다.</p>
+        <button class="btn primary" name="action" value="login">로그인</button>
+        <button class="btn" name="action" value="register">회원 가입</button>
+      </form>
+      <div class="actions record-actions">
+        <button id="save-record" class="btn primary hidden">이번 결산 저장</button>
+        <button id="logout" class="btn hidden">로그아웃</button>
+      </div>
+      <div id="history-panel" class="hidden">
+        <h2>내 결산</h2>
+        <div id="history-list"></div>
+      </div>
+      <h2>전체 랭킹</h2>
+      <label class="record-category">종목 <select id="rank-category"></select></label>
+      <div id="rank-list" aria-live="polite"></div>
+      <button id="records-back" class="btn">돌아가기</button>
+    </div>
+  </section>
+  <script type="module" src="src/main.js?v=3"></script>
 </body>
 </html>
