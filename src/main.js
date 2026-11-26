@@ -4,8 +4,8 @@ import { CAST_NAMES, officeScene } from "./office-scenes.js";
 import {
   CLEANUP_MINUTES, CODE_DELEGATION, CODE_REVIEW_MINUTES, DEBUG_PASS_MOVE, PHASES, RELATION_NAMES, act, canDelegateCode, canReviewCode,
   canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, hasDirectAssignments,
-  hasChainedWork, hasLanguageAssignment, hasProblemBank, hasShortProject, hasWorkContent, isCoding, isFriday, isTutorial, missionCount,
-  missionNotice, needsAssignment, newRun, nextAssignment, options, passWorkForDebug, projectDay, recordFor, recordPaste, requestCodeReview,
+  hasChainedWork, hasLanguageAssignment, hasOfficeClock, hasProblemBank, hasSaturdayShift, hasShortProject, hasWorkContent, isCoding, isFriday, isHalfDay, isTutorial, missionCount,
+  missionNotice, needsAssignment, newRun, nextAssignment, officeTime, options, passWorkForDebug, projectDay, recordFor, recordPaste, requestCodeReview,
   submitSolution, submitSpecialWork,
 } from "./office.js";
 import { WORK_TYPES, workResultRows } from "./work-missions.js";
@@ -282,7 +282,7 @@ const minesWindow = mountMinesWindow({
 
 const schedule = [
   ["arrive", "출근"], ["scrum", "데일리 스크럼"], ["assign", "업무 배분"], ["morning", "코딩 미션"],
-  ["lunch", "점심시간"], ["negotiate", "코딩·협상"], ["report", "진행 보고"], ["leave", "퇴근"],
+  ["lunch", "점심시간"], ["negotiate", "코딩·협상"], ["afternoon", "오후 업무"], ["report", "진행 보고"], ["leave", "퇴근"],
 ];
 for (const [key, label] of schedule) {
   const item = document.createElement("li");
@@ -416,17 +416,22 @@ function hideClockTime() {
   readout.textContent = "";
 }
 
-function peekAtClock() {
-  clearTimeout(clockPeekTimer);
-  const clock = PHASES[state.phase][0];
+function updateClockReadout() {
+  const clock = officeTime(state);
   $("office-clock-time").dateTime = clock;
   $("office-clock-time").textContent = clock;
+}
+
+function peekAtClock() {
+  clearTimeout(clockPeekTimer);
   clockPeekPhase = clockPhase();
+  updateClockReadout();
   clockPeekTimer = setTimeout(hideClockTime, 4000);
 }
 
 function hud() {
   if (clockPeekPhase && clockPeekPhase !== clockPhase()) hideClockTime();
+  else if (clockPeekPhase) updateClockReadout();
   $("hud-date").textContent = `${projectDay(state)}일차 · ${formatDate(state.day)}`;
   $("hud-dday").textContent = `D-${projectDay(state, state.deadline) - projectDay(state)}`;
   $("hud-dday").title = hasShortProject(state) ? "남은 근무일 기준" : "남은 날짜 기준";
@@ -462,18 +467,28 @@ function hud() {
     dd.textContent = value > 0 ? `+${value}` : String(value);
     return [dt, dd];
   }));
-  const active = ({ afternoon: "negotiate", overtime: "leave" })[state.phase] ?? state.phase;
+  const fullDay = hasOfficeClock(state);
+  const halfDay = isHalfDay(state);
+  const active = state.phase === "overtime" ? "leave" : !fullDay && state.phase === "afternoon" ? "negotiate" : state.phase;
   for (const node of $("schedule").children) {
     const step = node.dataset.step;
     let visible = true;
     if (step === "scrum") visible = !!state.scrum;
-    if (step === "morning") node.textContent = hasWorkContent(state) ? "10:00  업무 미션" : "10:00  코딩 미션";
-    if (step === "negotiate") node.textContent = hasWorkContent(state) ? "13:00  업무·협상" : "13:00  코딩·협상";
+    if (step === "morning") node.textContent = fullDay && !learning ? "스크럼 후  오전 업무" : hasWorkContent(state) ? "10:00  업무 미션" : "10:00  코딩 미션";
+    if (step === "negotiate") node.textContent = fullDay ? "13:00  부서 협상" : hasWorkContent(state) ? "13:00  업무·협상" : "13:00  코딩·협상";
+    if (step === "afternoon") {
+      node.textContent = learning ? "13:00  오후 업무" : "협상 후  오후 업무";
+      visible = fullDay;
+    }
+    if (step === "report") node.textContent = officeTime(state, "report") + (fullDay && isFriday(state.day) ? "  프로젝트 회의" : "  진행 보고");
+    if (step === "leave") node.textContent = officeTime(state, "leave") + "  퇴근";
     if (step === "assign") {
       node.textContent = state.scrum ? "스크럼 후  업무 배분" : "09:30  업무 배분";
       visible = state.scrum?.assignment ?? needsAssignment(state);
     }
-    if (isTutorial(state)) visible = ["arrive", "morning", "leave"].includes(step);
+    if (learning) visible = (fullDay ? ["arrive", "morning", "lunch", "afternoon", "report", "leave"] :
+      ["arrive", "morning", "leave"]).includes(step);
+    if (halfDay && ["lunch", "negotiate", "afternoon", "report"].includes(step)) visible = false;
     node.classList.toggle("hidden", !visible);
     if (step === active) node.setAttribute("aria-current", "step");
     else node.removeAttribute("aria-current");
@@ -484,12 +499,18 @@ function phaseStory() {
   const phase = state.phase;
   const [clock, title] = PHASES[phase];
   const events = phase === "arrive" ? isTutorial(state) ? "첫 출근" : state.event.title : title;
+  const fullDay = hasOfficeClock(state);
+  $("shift-clock").classList.toggle("hidden", fullDay);
   $("shift-clock").textContent = phase === "assign" && state.scrum ? "스크럼 직후" : clock;
   const mission = currentMission(state);
   const puzzle = !state.solvedToday && mission?.type && mission.type !== "code";
   $("shift-title").textContent = puzzle && isCoding(phase) ? title.replace("코딩", "업무") : events;
   switch (phase) {
     case "arrive": {
+      if (isHalfDay(state)) {
+        $("shift-title").textContent = "토요일 오전 근무";
+        return `오늘은 12시 퇴근이다. ${state.event.text}`;
+      }
       if (!isTutorial(state)) return state.event.text;
       if (hasLanguageAssignment(state) && state.playerName) {
         $("shift-title").textContent = state.language ? `배정 언어 · ${LANGUAGES[state.language].name}` : "신입 기술 스택 조사";
@@ -514,9 +535,15 @@ function phaseStory() {
         if (offer) {
           const missing = codingCost(state, offer) - state.remaining;
           if (missing <= 0) return `${budget} 김 과장이 다음 업무를 가져왔다.`;
-          const handoff = phase === "morning" && !isTutorial(state) ? "점심 이후에 이어서 배정한다." : "배정표에 남겨 뒀다.";
+          const handoff = isHalfDay(state) ? "월요일에 이어서 배정한다." :
+            phase === "morning" && (fullDay || !isTutorial(state)) ? "점심 이후에 이어서 배정한다." : "배정표에 남겨 뒀다.";
           return `${budget} ‘${offer.notice ?? offer.title}’에 ${formatMinutes(missing)}이 부족하다. ${handoff}`;
         }
+        if (fullDay && phase === "morning") {
+          if (isHalfDay(state)) return `${budget} 토요일 배정분을 마쳤다. 정오까지 남은 일정을 정리한다.`;
+          return `${budget} 오전 배정분을 마쳤다. ${isTutorial(state) ? "점심을 먹고 오후 업무를 받을 수 있다." : "점심시간까지 남은 일정을 정리한다."}`;
+        }
+        if (fullDay && phase === "afternoon") return `${budget} 오늘 배정분을 마쳤다. 남은 시간을 넘기고 진행 상황을 보고할 수 있다.`;
         return `${budget} 오늘 배정분을 마쳤다.${state.shift < projectDay(state, state.deadline) ? " 새 업무는 내일 들어온다." : ""}`;
       }
       if (!mission) return `${budget} 필수 기능 검수가 끝났다. 남은 추가 일감을 정리하고 퇴근하면 배포할 수 있다.`;
@@ -532,13 +559,14 @@ function phaseStory() {
       }
       return state.remaining >= needed ? `${budget} 배정 업무와 미션 제출에 ${formatMinutes(needed)}이 필요하다.` : budget;
     }
-    case "lunch": return "점심을 같이 먹을 사람을 고를 시간이다.";
+    case "lunch": return fullDay ? "12시부터 13시까지 점심시간이다. 누구와 먹을지 고른다." : "점심을 같이 먹을 사람을 고를 시간이다.";
     case "negotiate": {
       const team = DEPARTMENTS[state.department];
       $("shift-title").textContent = `${team.name} · ${state.request[0]}`;
       return `현재 관계 ${state.relations[state.department]} · 요청 수락 시 오후 ${formatMinutes(state.request[2])} 소요`;
     }
     case "report":
+      if (fullDay && isTutorial(state)) return `오늘 완료한 업무 ${state.workDoneToday}건을 김 과장에게 보고한다.`;
       if (isFriday(state.day)) {
         $("shift-title").textContent = "금요일 전체 프로젝트 회의";
         return "기획팀은 기능 추가, 디자인팀은 시안 수정, 영업팀은 납품일 단축을 요구한다. QA팀은 검수 시간이 필요하다.";
@@ -546,6 +574,7 @@ function phaseStory() {
       return hasChainedWork(state) ? `오늘 ${state.workDoneToday}건 완료 · ${projectStatus()}` :
         `기능 ${state.progress}/${missionCount(state)} · 추가 일감 ${state.scope}건. 김 과장이 현황을 묻는다.`;
     case "leave": {
+      if (isHalfDay(state)) return "토요일 오전 근무를 마쳤다. 남은 업무는 월요일에 이어서 한다.";
       if (isTutorial(state)) return "남은 업무는 다음 출근 때 이어서 할 수 있다.";
       return hasChainedWork(state) ? projectStatus() : "김 과장이 벽시계를 한 번 보고 자리에 앉는다.";
     }
@@ -554,6 +583,7 @@ function phaseStory() {
 
 function firstDayLesson() {
   if (!isTutorial(state)) return null;
+  if (hasOfficeClock(state) && state.phase === "lunch") return "신입, 점심은 한 시간이야. 오후에 자리로 돌아오면 새 일 하나 줄게.";
   if (state.phase === "leave") return "신입, 남은 건 내일 봐도 돼. 오늘 더 하고 갈 거야?";
   if (state.phase === "overtime" && state.moves.at(-1) === "stay") {
     return "더 한다고? 알았어. 컵라면은 비품 창고에 있어.";
@@ -736,7 +766,8 @@ function renderCoding() {
   $("code-debug-pass").disabled = busy || !canSubmit(state);
   const missing = cost - state.remaining;
   const next = submissionNextAction(options(state));
-  const followup = isTutorial(state) && state.phase === "morning"
+  const followup = isHalfDay(state) ? "정오에 퇴근한 뒤 월요일에 이어서 할 수 있어요."
+    : isTutorial(state) && !hasOfficeClock(state) && state.phase === "morning"
     ? "퇴근 준비 후 야근을 선택하거나 다음 출근에 이어서 할 수 있어요."
     : next?.id === "prepare"
     ? state.phase === "morning" ? "지금 조사한 만큼 오후에 필요한 시간이 줄어요." : "지금 조사해 두면 야근에서 이어서 할 수 있어요."
@@ -844,6 +875,8 @@ function renderOffice(focus = false, { reaction } = {}) {
       : `그래? 우리 팀은 ${LANGUAGES[state.language].name} 쓰는데. 처음이면 하면서 배우면 돼. 오늘까지야.`);
   } else if (lesson) {
     bossSay(lesson);
+  } else if (isHalfDay(state) && state.phase === "leave") {
+    bossSay("열두 시 됐어, 신입. 남은 건 월요일에 하자.");
   } else if (scene) {
     playOfficeScene(scene);
   } else if (state.phase === "arrive") {
@@ -869,7 +902,7 @@ function showOfficeGuide() {
   $("guide-stress-label").classList.toggle("hidden", !hasWorkContent(state));
   $("guide-stress-copy").classList.toggle("hidden", !hasWorkContent(state));
   $("guide-deadline-copy").textContent = hasChainedWork(state)
-    ? `10근무일 안에 업무 ${PROJECT_GOAL.work}건(배포 검수 포함)과 평가 ${PROJECT_GOAL.score}점을 채우고 추가 일감을 0건으로 만드세요.`
+    ? `10근무일 안에 업무 ${PROJECT_GOAL.work}건(배포 검수 포함)과 평가 ${PROJECT_GOAL.score}점을 채우고 추가 일감을 0건으로 만드세요.${hasSaturdayShift(state) ? " 토요일 오전도 근무일에 포함돼요." : ""}`
     : hasShortProject(state)
     ? `주말을 빼고 근무일 ${PROJECT_WORKDAYS}일 안에 프로젝트를 끝내세요.`
     : `${TOTAL_DAYS}일 안에 프로젝트를 끝내면 2026년으로 돌아가요.`;

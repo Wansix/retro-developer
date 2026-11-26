@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEBUG_PASS_MOVE, act, canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, missionCount, missionNotice, newRun, options, passWorkForDebug, playMinesAction, projectDay, recordFor, replayRun, requestCodeReview, submitSolution, submitSpecialWork } from "../src/office.js";
+import { DEBUG_PASS_MOVE, act, canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, isHalfDay, missionCount, missionNotice, newRun, officeTime, options, passWorkForDebug, playMinesAction, projectDay, recordFor, replayRun, requestCodeReview, submitSolution, submitSpecialWork } from "../src/office.js";
 import { MINE_BREAK_COST, MINE_WARNING_SECONDS, mineNeighbors } from "../src/mines.js";
 import { gradeWork, makeWork, WORK_TYPES, workOrder } from "../src/work-missions.js";
-import { formatDate, LANGUAGE_ASSIGNMENT_RULESET, PROBLEM_BANK_RULESET, SHORT_PROJECT_RULESET, WORK_CONTENT_RULESET } from "../src/records-schema.js";
+import { formatDate, LANGUAGE_ASSIGNMENT_RULESET, OFFICE_CLOCK_RULESET, PROBLEM_BANK_RULESET, SHORT_PROJECT_RULESET, WORK_CONTENT_RULESET } from "../src/records-schema.js";
 import { PROJECT_GOAL, projectReady } from "../src/project-work.js";
 import { LANGUAGES, assignedLanguage } from "../src/office-languages.js";
 
@@ -85,8 +85,8 @@ function step(run, ...moves) {
   for (const move of moves) assert.ok(act(run, move), `${run.day}일차 ${run.phase}: ${move}`);
 }
 
-function advance(run, solve) {
-  for (let i = 0; i < 350 && !run.ending; i++) {
+function advance(run, solve, until = state => state.ending) {
+  for (let i = 0; i < 350 && !run.ending && !until(run); i++) {
     if (solve && canSubmit(run)) {
       const work = currentMission(run);
       if (work.type === "code") assert.ok(submitSolution(run));
@@ -100,7 +100,7 @@ function advance(run, solve) {
     if (solve && run.scope && available.some(choice => choice.id === "cleanup")) step(run, "cleanup");
     else step(run, move ?? available[0].id);
   }
-  assert.ok(run.ending);
+  assert.ok(until(run));
 }
 
 test("a mixed run applies failures, advances projects, feeds the scrum, and replays the record", () => {
@@ -358,4 +358,80 @@ test("debug completion consumes the normal time and cannot be replayed for ranki
   advance(run, true);
   assert.ok(run.completedDay);
   assert.equal(replayRun(run), null);
+});
+
+test("the first shift uses the full schedule and only unlocks the afternoon assignment after lunch", () => {
+  const run = newRun(417);
+  assert.equal(officeTime(run), "09:00");
+  step(run, "stack-none", "arrive");
+  assert.equal(officeTime(run), "10:00");
+  assert.equal(run.remaining, 120);
+  for (const time of ["10:45", "11:10", "11:35"]) {
+    assert.ok(submitSolution(run));
+    assert.equal(officeTime(run), time);
+    if (time !== "11:35") step(run, "nextWork");
+  }
+  assert.equal(run.workDoneToday, 3);
+  assert.deepEqual(options(run).map(({ id }) => id), ["next"]);
+  assert.ok(!act(run, "leave"));
+  step(run, "next");
+  assert.equal(run.phase, "lunch");
+  assert.equal(officeTime(run), "12:00");
+  step(run, "rest");
+  assert.equal(officeTime(run), "13:00");
+  step(run, "nextWork");
+  const afternoonJob = currentMission(run);
+  assert.ok(["quiz", "review"].includes(afternoonJob.type));
+  assert.equal(submitSpecialWork(run, solution(afternoonJob)).passed, true);
+  assert.ok(officeTime(run) === "13:45" || officeTime(run) === "13:55");
+  step(run, "next");
+  assert.equal(officeTime(run), "17:15");
+  step(run, "reportBrief");
+  assert.equal(officeTime(run), "18:00");
+  step(run, "leave");
+  assert.equal(officeTime(run), "09:00");
+  assert.equal(run.scrum.yesterday.workCount, 4);
+});
+
+test("unsubmitted work carries over the lunch break and Friday reserves enough time for the project meeting", () => {
+  const run = newRun(417);
+  step(run, "stack-none", "arrive");
+  const id = currentMission(run).id;
+  assert.equal(failCodeSubmission(run), 5);
+  assert.equal(officeTime(run), "10:05");
+  step(run, "next", "rest");
+  assert.equal(currentMission(run).id, id);
+  assert.equal(officeTime(run), "13:00");
+  const friday = { ...run, day: 5, shift: 5, phase: "report" };
+  assert.equal(officeTime(friday), "16:25");
+  step(friday, "no");
+  assert.equal(officeTime(friday), "18:00");
+});
+
+test("new runs count Saturday mornings and skip Sunday while older saves keep their calendar", () => {
+  const run = newRun(417);
+  assert.equal(run.deadline, 11);
+  assert.equal(projectDay(run, run.deadline), 10);
+  assert.equal(formatDate(run.deadline), "3월 16일 목");
+  advance(run, false, state => state.shift === 6);
+  assert.equal(run.day, 6);
+  assert.ok(isHalfDay(run));
+  assert.equal(officeTime(run), "09:00");
+  const unfinished = currentMission(run).id;
+  advance(run, false, state => state.phase === "leave");
+  assert.equal(officeTime(run), "12:00");
+  assert.deepEqual(options(run).map(({ id }) => id), ["leave"]);
+  assert.equal(act(run, "stay"), false);
+  step(run, "leave");
+  assert.equal(run.day, 8);
+  assert.equal(projectDay(run), 7);
+  assert.equal(currentMission(run).id, unfinished);
+  assert.equal(formatDate(run.day), "3월 13일 월");
+  advance(run, false);
+  assert.deepEqual(replayRun(run), recordFor(run));
+
+  const previous = newRun(417, undefined, OFFICE_CLOCK_RULESET);
+  advance(previous, false, state => state.shift === 6);
+  assert.equal(previous.day, 8);
+  assert.equal(previous.deadline, 12);
 });

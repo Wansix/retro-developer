@@ -8,11 +8,13 @@ export const PROBLEM_BANK_RULESET = 6;
 export const CHAINED_WORK_RULESET = 7;
 export const LANGUAGE_ASSIGNMENT_RULESET = 8;
 export const FUNDAMENTALS_RULESET = 9;
+export const OFFICE_CLOCK_RULESET = 10;
+export const SATURDAY_SHIFT_RULESET = 11;
 export const PROJECT_WORKDAYS = 10;
-export const RULESET = FUNDAMENTALS_RULESET;
+export const RULESET = SATURDAY_SHIFT_RULESET;
 
-export const calendarDayForWorkday = day => day + 2 * Math.floor((day - 1) / 5);
-export const workdayForCalendarDay = day => day - 2 * Math.floor((day - 1) / 7);
+export const calendarDayForWorkday = (day, daysPerWeek = 5) => day + (7 - daysPerWeek) * Math.floor((day - 1) / daysPerWeek);
+export const workdayForCalendarDay = (day, daysPerWeek = 5) => day - (7 - daysPerWeek) * Math.floor((day - 1) / 7);
 
 export const SCRUM_METRICS = [
   ["scrums", "스크럼 참석", "회"],

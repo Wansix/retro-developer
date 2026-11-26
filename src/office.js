@@ -1,6 +1,6 @@
 import { ARCHITECTURE, AUTOMATION, CODE_REVIEW, DEPARTMENTS, ENDINGS, EXTRA_TICKETS, LUNCH, OFFICE_EVENTS, TICKETS } from "./office-content.js";
 import { MISSIONS } from "./missions.js";
-import { CHAINED_WORK_RULESET, DIRECT_ASSIGNMENT_RULESET, FUNDAMENTALS_RULESET, LANGUAGE_ASSIGNMENT_RULESET, PROBLEM_BANK_RULESET, PROJECT_WORKDAYS, RULESET, SCRUM_RULESET, SHORT_PROJECT_RULESET, TOTAL_DAYS, WORK_CONTENT_RULESET, calendarDayForWorkday, formatMinutes, workdayForCalendarDay } from "./records-schema.js";
+import { CHAINED_WORK_RULESET, DIRECT_ASSIGNMENT_RULESET, FUNDAMENTALS_RULESET, LANGUAGE_ASSIGNMENT_RULESET, OFFICE_CLOCK_RULESET, PROBLEM_BANK_RULESET, PROJECT_WORKDAYS, RULESET, SATURDAY_SHIFT_RULESET, SCRUM_RULESET, SHORT_PROJECT_RULESET, TOTAL_DAYS, WORK_CONTENT_RULESET, calendarDayForWorkday, formatMinutes, workdayForCalendarDay } from "./records-schema.js";
 import { SCRUM_REPORTS, beginScrumDay, finishScrumDay, finishScrumRun, handleScrum, initScrum, markMorningDelivery } from "./scrum.js";
 import { makeWork, gradeWork, problemBankWorkOrder, shortWorkOrder, workOrder, WORK_TYPES } from "./work-missions.js";
 import { applyLeisure, award, canOpenLeisure, initLeisure } from "./mines.js";
@@ -40,8 +40,30 @@ export const hasShortProject = (s) => s.ruleset >= SHORT_PROJECT_RULESET;
 export const hasProblemBank = (s) => s.ruleset >= PROBLEM_BANK_RULESET;
 export const hasChainedWork = (s) => s.ruleset >= CHAINED_WORK_RULESET;
 export const hasLanguageAssignment = (s) => s.ruleset >= LANGUAGE_ASSIGNMENT_RULESET;
-export const projectDay = (s, day = s.day) => hasShortProject(s) ? workdayForCalendarDay(day) : day;
-const projectLimit = s => hasShortProject(s) ? calendarDayForWorkday(PROJECT_WORKDAYS) : TOTAL_DAYS;
+export const hasOfficeClock = (s) => s.ruleset >= OFFICE_CLOCK_RULESET;
+export const hasSaturdayShift = (s) => s.ruleset >= SATURDAY_SHIFT_RULESET;
+export const isHalfDay = (s) => hasSaturdayShift(s) && s.day % 7 === 6;
+const daysPerWeek = s => hasSaturdayShift(s) ? 6 : 5;
+const projectCalendarDay = (s, workday) => calendarDayForWorkday(workday, daysPerWeek(s));
+const LUNCH_START = 12 * 60;
+const LUNCH_END = 13 * 60;
+const WORK_END = 18 * 60;
+const OVERTIME_MINUTES = 185;
+const reportStart = s => WORK_END - (isFriday(s.day) ? 95 : 45);
+
+export function officeTime(s, phase = s.phase) {
+  if (!hasOfficeClock(s)) return PHASES[phase][0];
+  const times = {
+    arrive: 9 * 60, scrum: Math.max(9 * 60 + 30, LUNCH_START - s.remaining),
+    assign: LUNCH_START - s.remaining, morning: LUNCH_START - s.remaining,
+    lunch: LUNCH_START, negotiate: LUNCH_END, afternoon: reportStart(s) - s.remaining,
+    report: reportStart(s), leave: isHalfDay(s) ? LUNCH_START : WORK_END, overtime: WORK_END + OVERTIME_MINUTES - s.remaining,
+  };
+  const minutes = times[phase];
+  return String(Math.floor(minutes / 60)).padStart(2, "0") + ":" + String(minutes % 60).padStart(2, "0");
+}
+export const projectDay = (s, day = s.day) => hasShortProject(s) ? workdayForCalendarDay(day, daysPerWeek(s)) : day;
+const projectLimit = s => hasShortProject(s) ? projectCalendarDay(s, PROJECT_WORKDAYS) : TOTAL_DAYS;
 export const currentMission = (s) => hasWorkContent(s)
   ? makeWork(hasChainedWork(s) ? s.activeWork : s.workOrder[s.progress], s.seed, s.language)
   : MISSIONS[s.progress];
@@ -78,7 +100,7 @@ export function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0], id 
   run.deadline = projectLimit(run);
   if (ruleset >= SCRUM_RULESET) initScrum(run);
   if (hasWorkContent(run)) {
-    run.workOrder = hasChainedWork(run) ? projectWorkDeck(seed, ruleset >= FUNDAMENTALS_RULESET) : hasProblemBank(run) ? problemBankWorkOrder(seed) :
+    run.workOrder = hasChainedWork(run) ? projectWorkDeck(seed, ruleset >= FUNDAMENTALS_RULESET, hasOfficeClock(run)) : hasProblemBank(run) ? problemBankWorkOrder(seed) :
       hasShortProject(run) ? shortWorkOrder() : workOrder(seed);
     run.stress = 18;
     run.stats.workMinutes = 0;
@@ -137,7 +159,7 @@ function change(s, effect) {
   if (effect.deadline && hasShortProject(s)) {
     const firstPossible = Math.max(projectDay(s), hasChainedWork(s) ? 9 : missionCount(s));
     const adjusted = clamp(projectDay(s, s.deadline) + effect.deadline, firstPossible, PROJECT_WORKDAYS);
-    s.deadline = calendarDayForWorkday(adjusted);
+    s.deadline = projectCalendarDay(s, adjusted);
   } else if (!hasShortProject(s)) {
     s.deadline = clamp(s.deadline + (effect.deadline ?? 0), s.day, TOTAL_DAYS);
   }
@@ -161,7 +183,7 @@ function chooseTickets(s, ids, effect, text) {
 }
 
 function advanceFromCoding(s) {
-  s.phase = isTutorial(s) ? "leave" : s.phase === "morning" ? "lunch" : "report";
+  s.phase = isHalfDay(s) || (isTutorial(s) && !hasOfficeClock(s)) ? "leave" : s.phase === "morning" ? "lunch" : "report";
 }
 
 export function codingCost(s, mission = currentMission(s)) {
@@ -350,7 +372,7 @@ function finishShift(s) {
     if (Object.values(s.relations).filter((n) => n >= 4).length >= 4) return finish(s, "teamwork");
     return finish(s, "release");
   }
-  const next = isFriday(s.day) ? s.day + 3 : s.day + 1;
+  const next = hasSaturdayShift(s) ? projectCalendarDay(s, projectDay(s) + 1) : isFriday(s.day) ? s.day + 3 : s.day + 1;
   if (next > s.deadline) return finish(s, "deadline");
   if (s.scrum) finishScrumDay(s);
   s.day = next;
@@ -422,7 +444,7 @@ function handleNegotiation(s, id) {
   }
   if (s.scrum && key === "planning") s.scrum.today.planning += disruption;
   if (s.scrum && key === "qa") s.scrum.today.bugs += scope;
-  s.remaining = (hasChainedWork(s) ? 205 : 270) - disruption;
+  s.remaining = (hasOfficeClock(s) ? reportStart(s) - LUNCH_END : hasChainedWork(s) ? 205 : 270) - disruption;
   s.phase = "afternoon";
 }
 
@@ -453,7 +475,7 @@ export function options(s) {
       }
       if (isTutorial(s)) return [choice("arrive", "첫 업무 시작")];
       if (s.shift === 9) return [
-        choice("automate", "검수표를 자동화한다", "오전 업무 시간 +1시간 30분"),
+        choice("automate", "검수표를 자동화한다", hasOfficeClock(s) ? "오전 준비 시간 절약 · 추가 일감 +1건" : "오전 업무 시간 +1시간 30분"),
         choice("arrive", "오늘은 수동으로 검수한다"),
       ];
       return [choice("arrive", s.scrum ? "데일리 스크럼 참석" : "업무표 확인")];
@@ -488,7 +510,7 @@ export function options(s) {
           ...(s.scope && s.phase !== "morning" ? [choice("cleanup", "추가 일감 1건 정리",
             `시간 ${formatMinutes(CLEANUP_MINUTES)} · 인사평가 +4`, s.remaining < CLEANUP_MINUTES)] : []),
           ...(!isTutorial(s) && !s.coffee ? [choice("coffee", "커피 한 잔", "시간 25분 · 체력 +8 · 스트레스 −5", s.remaining < 25)] : []),
-          choice("next", s.phase === "overtime" ? "야근을 마치고 퇴근" : isTutorial(s) ? "퇴근 준비" :
+          choice("next", s.phase === "overtime" ? "야근을 마치고 퇴근" : isHalfDay(s) ? "정오 퇴근 준비" : isTutorial(s) && !hasOfficeClock(s) ? "퇴근 준비" :
             s.phase === "morning" ? "점심시간으로" : "진행 상황 보고"),
         ];
       }
@@ -530,6 +552,7 @@ export function options(s) {
           : "관계 +4 이상 필요 · 회의 15분", s.relations[s.department] < 4),
       ];
     case "report":
+      if (hasOfficeClock(s) && isTutorial(s)) return [choice("reportBrief", "첫날 업무를 보고한다", "보고 15분")];
       if (isFriday(s.day)) return [
         choice("yes", "네, 가능합니다."),
         choice("no", "물리적으로 불가능합니다."),
@@ -545,8 +568,8 @@ export function options(s) {
         const ready = projectReady(s, s.score - 4);
         const workWaiting = !!(s.scope || currentMission(s) || nextAssignment(s));
         return [
-          choice("leave", "정시 퇴근", ready ? "납품 목표 달성 · 오늘 프로젝트 종료" : "체력 +16 · 평가 −4 · 스트레스 −12"),
-          ...(!ready && (workWaiting || s.score - 4 < PROJECT_GOAL.score)
+          choice("leave", isHalfDay(s) ? "12시 퇴근" : "정시 퇴근", ready ? "납품 목표 달성 · 오늘 프로젝트 종료" : "체력 +16 · 평가 −4 · 스트레스 −12"),
+          ...(!isHalfDay(s) && !ready && (workWaiting || s.score - 4 < PROJECT_GOAL.score)
             ? [choice("stay", workWaiting ? "야근" : "평가를 위해 야근", `체력 −24 · 평가 +16 · 스트레스 +22${workWaiting ? " · 업무 시간 3시간 5분" : ""}${s.stats.overtime && projectDay(s, s.deadline) === 10 && s.shift < 10 ? " · 마감 −1일" : ""}`)]
             : []),
         ];
@@ -573,15 +596,19 @@ export function act(s, id) {
         }
         s.stats.calledSimple++;
         s.stats.actuallySimple++;
+        if (hasOfficeClock(s)) s.remaining = LUNCH_START - 10 * 60;
         s.phase = "morning";
         break;
       }
       if (s.shift !== 9 || id === "automate") change(s, s.event.effect);
       change(s, { meeting: (s.scrum ? 0 : 30) + s.nextMeeting });
       s.nextMeeting = 0;
+      if (hasOfficeClock(s)) s.remaining = Math.min(s.remaining, LUNCH_START - (9 * 60 + 30));
       if (id === "automate") {
         s.stats.calledSimple++;
-        s.effects = ["검수표를 자동으로 만들었다. 김 과장이 절약된 1시간 30분을 보고 ‘간단한 일’ 1시간 30분을 추가했다."];
+        s.effects = [hasOfficeClock(s)
+          ? "검수표 자동화로 오전 준비를 빨리 마쳤다. 김 과장이 곧바로 ‘간단한 것’ 한 건을 추가했다."
+          : "검수표를 자동으로 만들었다. 김 과장이 절약된 1시간 30분을 보고 ‘간단한 일’ 1시간 30분을 추가했다."];
       }
       s.phase = s.scrum ? "scrum" : "assign";
       break;
@@ -659,7 +686,10 @@ export function act(s, id) {
         change(s, { hp: 10, stress: -10 });
         s.effects = ["호출기 없이 먹는 밥은 오랜만이다."];
       }
-      s.phase = "negotiate";
+      if (hasOfficeClock(s) && isTutorial(s)) {
+        s.remaining = reportStart(s) - LUNCH_END;
+        s.phase = "afternoon";
+      } else s.phase = "negotiate";
       break;
     case "negotiate":
       handleNegotiation(s, id);
@@ -683,7 +713,7 @@ export function act(s, id) {
         s.stats.overtime++;
         const compressed = s.stats.overtime > 1;
         change(s, { hp: -24, score: 16, stress: 22, deadline: compressed ? -1 : 0 });
-        s.remaining = 185;
+        s.remaining = OVERTIME_MINUTES;
         s.phase = "overtime";
         s.effects = [compressed ? "‘지난번에도 되던데?’ 새 마감이 하루 당겨졌다." : "김 과장이 비품 창고에서 컵라면을 하나 꺼냈다."];
       }
