@@ -1,4 +1,5 @@
 import { INTRANET_DOCUMENTS } from "./intranet-documents.js";
+import { LANGUAGE_DOCUMENTS } from "./intranet-language-documents.js";
 
 const STOP_WORDS = new Set(["python", "파이썬", "in", "a", "the", "of", "to", "is", "방법", "하는", "어떻게", "사용법", "예제", "질문", "검색"]);
 const LEGACY_TOPICS = {
@@ -22,12 +23,13 @@ const contains = (text, word) => {
   return (" " + text + " ").includes(" " + word + " ");
 };
 
-const index = INTRANET_DOCUMENTS.map(doc => ({
+const documents = [...INTRANET_DOCUMENTS, ...LANGUAGE_DOCUMENTS];
+const index = documents.map(doc => ({
   doc,
   title: normalize(doc.title),
   keys: [...new Set([...doc.tags, ...doc.terms].map(normalize))].filter(Boolean),
 }));
-const articles = new Map(INTRANET_DOCUMENTS.map(doc => [doc.id, doc]));
+const articles = new Map(documents.map(doc => [doc.id, doc]));
 
 export const documentById = id => articles.get(id);
 export const missionTopics = mission => mission?.tags ?? LEGACY_TOPICS[mission?.id] ?? [];
@@ -42,12 +44,12 @@ function eraTopic(query) {
   if (/chatgpt|챗지피티|챗gpt/.test(compact)) return "chatgpt";
 }
 
-export function searchIntranet(query, topics = []) {
+export function searchIntranet(query, topics = [], language = "python") {
   const normalized = normalize(query);
   if (!normalized || eraTopic(query)) return [];
   const terms = [...new Set(normalized.split(" ").filter(term => !STOP_WORDS.has(term)))];
   if (!terms.length) return [];
-  return index.map(({ doc, title, keys }) => {
+  return index.filter(({ doc }) => (doc.language ?? "python") === language).map(({ doc, title, keys }) => {
     let score = keys.includes(normalized) ? 15 : 0;
     for (const key of keys) {
       if (!STOP_WORDS.has(key) && contains(normalized, key)) score += key.includes(" ") ? 7 : 4;
@@ -92,7 +94,7 @@ export function recordInternetSearch(state, raw, mission, fromHistory = false) {
   const query = raw.trim().slice(0, 96);
   const key = normalize(query);
   if (!key) return null;
-  visitInternetPage(state, { view: "results", query, topics: missionTopics(mission) });
+  visitInternetPage(state, { view: "results", query, topics: missionTopics(mission), language: mission?.language ?? "python" });
   if (fromHistory) return null;
   state.searches = [query, ...state.searches.filter(prior => normalize(prior) !== key)].slice(0, 20);
   if (looksLikeError(query)) state.errors++;

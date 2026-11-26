@@ -6,8 +6,9 @@ export const WORK_CONTENT_RULESET = 4;
 export const SHORT_PROJECT_RULESET = 5;
 export const PROBLEM_BANK_RULESET = 6;
 export const CHAINED_WORK_RULESET = 7;
+export const LANGUAGE_ASSIGNMENT_RULESET = 8;
 export const PROJECT_WORKDAYS = 10;
-export const RULESET = CHAINED_WORK_RULESET;
+export const RULESET = LANGUAGE_ASSIGNMENT_RULESET;
 
 export const calendarDayForWorkday = day => day + 2 * Math.floor((day - 1) / 5);
 export const workdayForCalendarDay = day => day - 2 * Math.floor((day - 1) / 7);

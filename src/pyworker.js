@@ -1,10 +1,15 @@
 importScripts("https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js");
 
 const OUTPUT_LIMIT = 4000;
+const send = self.postMessage.bind(self);
 
 async function init() {
-  const py = await loadPyodide();
-  postMessage({ type: "ready" });
+  const py = await loadPyodide({ jsglobals: Object.create(null) });
+  // Only initialization needs network access. Submitted code runs in this worker with an empty JS module.
+  const blocked = ["fetch", "XMLHttpRequest", "WebSocket", "WebTransport", "EventSource", "importScripts", "Worker",
+    "SharedWorker", "indexedDB", "caches", "BroadcastChannel", "postMessage", "navigator"];
+  for (const key of blocked) Object.defineProperty(self, key, { value: undefined });
+  send({ type: "ready" });
   self.onmessage = async ({ data: { code, jobId, check, verify } }) => {
     let stdout = "";
     const append = (line) => {
@@ -17,13 +22,13 @@ async function init() {
       await py.runPythonAsync(code, { globals: namespace });
       if (check?.type === "bank-function") {
         const tests = await gradeBank(py, code, check, verify);
-        postMessage({ type: "result", jobId, ok: true, stdout, ...tests });
+        send({ type: "result", jobId, ok: true, stdout, ...tests });
       } else {
         const passed = check ? await grade(py, namespace, code, check, stdout) : undefined;
-        postMessage({ type: "result", jobId, ok: true, stdout, passed });
+        send({ type: "result", jobId, ok: true, stdout, passed });
       }
     } catch (error) {
-      postMessage({ type: "result", jobId, ok: false, stdout, error: String(error).slice(0, OUTPUT_LIMIT) });
+      send({ type: "result", jobId, ok: false, stdout, error: String(error).slice(0, OUTPUT_LIMIT) });
     } finally {
       namespace.destroy();
     }
@@ -150,4 +155,4 @@ alternate
   }
 }
 
-init().catch(() => postMessage({ type: "unavailable" }));
+init().catch(() => send({ type: "unavailable" }));

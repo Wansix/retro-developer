@@ -1,10 +1,11 @@
 import { ARCHITECTURE, AUTOMATION, CODE_REVIEW, DEPARTMENTS, ENDINGS, EXTRA_TICKETS, LUNCH, OFFICE_EVENTS, TICKETS } from "./office-content.js";
 import { MISSIONS } from "./missions.js";
-import { CHAINED_WORK_RULESET, DIRECT_ASSIGNMENT_RULESET, PROBLEM_BANK_RULESET, PROJECT_WORKDAYS, RULESET, SCRUM_RULESET, SHORT_PROJECT_RULESET, TOTAL_DAYS, WORK_CONTENT_RULESET, calendarDayForWorkday, formatMinutes, workdayForCalendarDay } from "./records-schema.js";
+import { CHAINED_WORK_RULESET, DIRECT_ASSIGNMENT_RULESET, LANGUAGE_ASSIGNMENT_RULESET, PROBLEM_BANK_RULESET, PROJECT_WORKDAYS, RULESET, SCRUM_RULESET, SHORT_PROJECT_RULESET, TOTAL_DAYS, WORK_CONTENT_RULESET, calendarDayForWorkday, formatMinutes, workdayForCalendarDay } from "./records-schema.js";
 import { SCRUM_REPORTS, beginScrumDay, finishScrumDay, finishScrumRun, handleScrum, initScrum, markMorningDelivery } from "./scrum.js";
 import { makeWork, gradeWork, problemBankWorkOrder, shortWorkOrder, workOrder, WORK_TYPES } from "./work-missions.js";
 import { applyLeisure, award, canOpenLeisure, initLeisure } from "./mines.js";
 import { DEPLOYMENT_WORK, OPENING_WORK, PROJECT_GOAL, nextProjectWork, projectReady, projectWorkDeck } from "./project-work.js";
+import { assignedLanguage, LANGUAGES } from "./office-languages.js";
 
 export const PHASES = {
   arrive: ["09:00", "출근"],
@@ -38,13 +39,14 @@ export const hasWorkContent = (s) => s.ruleset >= WORK_CONTENT_RULESET;
 export const hasShortProject = (s) => s.ruleset >= SHORT_PROJECT_RULESET;
 export const hasProblemBank = (s) => s.ruleset >= PROBLEM_BANK_RULESET;
 export const hasChainedWork = (s) => s.ruleset >= CHAINED_WORK_RULESET;
+export const hasLanguageAssignment = (s) => s.ruleset >= LANGUAGE_ASSIGNMENT_RULESET;
 export const projectDay = (s, day = s.day) => hasShortProject(s) ? workdayForCalendarDay(day) : day;
 const projectLimit = s => hasShortProject(s) ? calendarDayForWorkday(PROJECT_WORKDAYS) : TOTAL_DAYS;
 export const currentMission = (s) => hasWorkContent(s)
-  ? makeWork(hasChainedWork(s) ? s.activeWork : s.workOrder[s.progress], s.seed)
+  ? makeWork(hasChainedWork(s) ? s.activeWork : s.workOrder[s.progress], s.seed, s.language)
   : MISSIONS[s.progress];
 export const missionCount = (s) => hasChainedWork(s) ? PROJECT_GOAL.work : hasWorkContent(s) ? s.workOrder.length : MISSIONS.length;
-export const nextAssignment = (s) => hasChainedWork(s) && !s.activeWork ? makeWork(nextProjectWork(s), s.seed) : null;
+export const nextAssignment = (s) => hasChainedWork(s) && !s.activeWork ? makeWork(nextProjectWork(s), s.seed, s.language) : null;
 export const missionNotice = (s) => {
   const work = currentMission(s) ?? nextAssignment(s);
   return work ? { title: work.notice ?? work.title, estimate: work.estimate } : null;
@@ -438,6 +440,10 @@ export function options(s) {
   if (s.ending || s.leisure?.open) return [];
   switch (s.phase) {
     case "arrive":
+      if (isTutorial(s) && hasLanguageAssignment(s) && !s.language) {
+        return [...Object.entries(LANGUAGES).map(([id, { name }]) => choice("stack-" + id, name + " 할 줄 알아요")),
+          choice("stack-none", "아직 할 줄 아는 언어가 없어요")];
+      }
       if (isTutorial(s)) return [choice("arrive", "첫 업무 시작")];
       if (s.shift === 9) return [
         choice("automate", "검수표를 자동화한다", "오전 업무 시간 +1시간 30분"),
@@ -553,6 +559,11 @@ export function act(s, id) {
   switch (s.phase) {
     case "arrive":
       if (isTutorial(s)) {
+        if (hasLanguageAssignment(s) && !s.language) {
+          s.familiarLanguage = id.slice("stack-".length);
+          s.language = assignedLanguage(s.seed, s.familiarLanguage);
+          break;
+        }
         s.stats.calledSimple++;
         s.stats.actuallySimple++;
         s.phase = "morning";
@@ -689,6 +700,7 @@ export function recordFor(s) {
     record.deliverySubmitted = s.deliverySubmitted;
     record.scope = s.scope;
   }
+  if (hasLanguageAssignment(s)) record.language = s.language;
   return record;
 }
 

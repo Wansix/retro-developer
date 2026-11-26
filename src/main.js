@@ -4,7 +4,7 @@ import { CAST_NAMES, officeScene } from "./office-scenes.js";
 import {
   CLEANUP_MINUTES, CODE_DELEGATION, CODE_REVIEW_MINUTES, PHASES, RELATION_NAMES, act, canDelegateCode, canReviewCode,
   canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, hasDirectAssignments,
-  hasChainedWork, hasProblemBank, hasShortProject, hasWorkContent, isCoding, isFriday, isTutorial, missionCount,
+  hasChainedWork, hasLanguageAssignment, hasProblemBank, hasShortProject, hasWorkContent, isCoding, isFriday, isTutorial, missionCount,
   missionNotice, needsAssignment, newRun, nextAssignment, options, projectDay, recordFor, recordPaste, requestCodeReview,
   submitSolution, submitSpecialWork,
 } from "./office.js";
@@ -21,6 +21,8 @@ import { initRecords, openRecords, syncRecord } from "./records.js";
 import { dialogueLine, initDialogueSound, playFootsteps, typeDialogue } from "./dialogue.js";
 import { playIntro } from "./intro.js";
 import { OPENING_WORK, PROJECT_GOAL } from "./project-work.js";
+import { LANGUAGES } from "./office-languages.js";
+import { mountOfficePresence } from "./office-presence.js";
 
 const $ = (id) => document.getElementById(id);
 const RUN_KEY = "retro-office-run-v1";
@@ -31,6 +33,7 @@ let draft = null;
 let workDraft = null;
 let internetState = newInternetState();
 let companionState = newCompanionState();
+let presenceSeen = [];
 let shownMission;
 let shownChallenge;
 let readChallenge;
@@ -65,6 +68,7 @@ function show(id) {
   stopOfficeScene();
   bossTyping?.abort();
   $("boss-face").dataset.action = "still";
+  delete $("office-scene").dataset.speaking;
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   window.scrollTo(0, 0);
@@ -178,7 +182,7 @@ function saveLocal(key, value) {
 }
 
 function checkpoint() {
-  if (!state.ending) saveLocal(RUN_KEY, { state, draft, workDraft, internetState, companionState });
+  if (!state.ending) saveLocal(RUN_KEY, { state, draft, workDraft, internetState, companionState, presenceSeen });
 }
 
 const companion = mountOfficeCompanion({
@@ -186,6 +190,16 @@ const companion = mountOfficeCompanion({
   getShift: () => state?.shift ?? 0,
   paused: () => officeGuide.open || $("mission-help").open || $("challenge-help").open || !!state?.leisure?.warning,
   onChange: checkpoint,
+});
+
+const presence = mountOfficePresence({
+  active: () => !!state && hasLanguageAssignment(state) && $("screen-office").classList.contains("active") && isCoding(state.phase),
+  available: () => !busy && !!state.guideSeen && !officeLines.length && !document.querySelector("dialog[open]") &&
+    !state.leisure?.open && !$("office-scene").dataset.speaking,
+  read: () => presenceSeen,
+  save(kind) { presenceSeen.push(kind); checkpoint(); },
+  boss: bossSay,
+  companion: companion.emit,
 });
 
 const intranet = mountIntranet({
@@ -268,9 +282,11 @@ function officeSay(who, line, { source, expression } = {}) {
   const target = $("boss-line");
   target.replaceChildren();
   $("office-speaker").textContent = CAST_NAMES[who];
+  $("office-scene").dataset.speaking = "true";
   setOfficePortrait(who, "talking");
   return dialogueLine(target, line, { voice: who, letterMs: 34, maxMs: 1150, signal }).then(() => {
     if (signal.aborted) return;
+    delete $("office-scene").dataset.speaking;
     setOfficePortrait(who, expression ? "expression" : "idle");
     if (!source) return;
     const tag = document.createElement("span");
@@ -338,6 +354,7 @@ async function react(kind) {
 
 function resetIdle() {
   clearTimeout(idle);
+  if (!state || hasLanguageAssignment(state)) return;
   if (!officeGuide.open && !$("mission-help").open && !$("challenge-help").open && !state?.leisure?.open && !editor.disabled &&
     !$("coding-panel").classList.contains("internet-open") &&
     (!$("coding-panel").classList.contains("hidden") || !$("work-challenge").classList.contains("hidden"))) {
@@ -426,7 +443,14 @@ function phaseStory() {
   const puzzle = !state.solvedToday && mission?.type && mission.type !== "code";
   $("shift-title").textContent = puzzle && isCoding(phase) ? title.replace("코딩", "업무") : events;
   switch (phase) {
-    case "arrive": return isTutorial(state) ? "김 과장이 자리 앞에서 당신을 불러 세웠다." : state.event.text;
+    case "arrive": {
+      if (!isTutorial(state)) return state.event.text;
+      if (hasLanguageAssignment(state) && state.playerName) {
+        $("shift-title").textContent = state.language ? `배정 언어 · ${LANGUAGES[state.language].name}` : "신입 기술 스택 조사";
+        return state.language ? LANGUAGES[state.language].assignment : "가장 자신 있는 언어를 골라 주세요.";
+      }
+      return "김 과장이 자리 앞에서 당신을 불러 세웠다.";
+    }
     case "scrum": return state.scrum.event?.text ?? "어제 한 일, 오늘 할 일, 막힌 문제만 짧게 공유한다.";
     case "assign": {
       if (!hasWorkContent(state)) return "김 과장이 오늘 업무표를 돌린다. 정 부장이 지켜보고 있고, 박 대리는 이미 볼펜 뚜껑을 열었다.";
@@ -558,6 +582,7 @@ function takeOfficeAction(id) {
 function renderChoices() {
   const naming = isTutorial(state) && state.phase === "arrive" && !state.playerName;
   $("name-form").classList.toggle("hidden", !naming);
+  $("player-name-submit").textContent = hasLanguageAssignment(state) ? "이름 알려주기" : "첫 업무 시작";
   $("choices").classList.toggle("hidden", naming);
   const choices = options(state);
   const inline = submissionNextAction(choices);
@@ -584,7 +609,7 @@ function renderCodingSupport(mission) {
   const fromBank = !!mission.fromBank;
   const reviewed = fromBank && state.reviewedProblem === mission.id;
   $("mission-support").classList.toggle("hidden", !hasProblemBank(state));
-  $("mission-bank-meta").classList.toggle("hidden", !fromBank);
+  $("mission-bank-meta").classList.toggle("hidden", !fromBank && !hasLanguageAssignment(state));
   $("mission-public-tests").classList.toggle("hidden", !fromBank);
   $("mission-review-code").classList.toggle("hidden", !fromBank || reviewed);
   $("mission-review-code").disabled = busy || !canReviewCode(state);
@@ -616,8 +641,10 @@ function renderCoding() {
     $("mission-example-out").classList.toggle("hidden", !mission.exampleOut);
     $("mission-req").textContent = mission.requirement;
     $("mission-expected").textContent = mission.expectedOut;
+    const languageName = LANGUAGES[state.language ?? "python"].name;
     $("mission-bank-meta").textContent = mission.fromBank
-      ? `${mission.difficultyLabel} · ${mission.tags.join(", ")} · 완료 시 인사평가 +${mission.reward.score}` : "";
+      ? [languageName, mission.difficultyLabel, mission.tags.join(", "), mission.reward && `완료 시 인사평가 +${mission.reward.score}`].filter(Boolean).join(" · ")
+      : languageName;
     replaceList($("mission-public-cases"), mission.publicExamples ?? []);
     $("mission-delegation-options").open = false;
     $("hint-box").textContent = mission.hint;
@@ -638,7 +665,7 @@ function renderCoding() {
     : { morning: "점심을 넘기고 오후 업무 시간에 다시 제출할 수 있어요.", afternoon: "보고를 마친 뒤 야근을 선택하면 오늘 업무를 이어서 할 수 있어요.", overtime: "오늘 업무가 끝나면 다음 출근 때 다시 도전할 수 있어요." }[state.phase];
   $("submit-help").classList.toggle("hidden", !busy && missing <= 0);
   $("submit-status").textContent = busy
-    ? "Python 실행 중이에요. 결과가 나올 때까지 기다려 주세요."
+    ? `${LANGUAGES[state.language ?? "python"].name} 실행 중이에요. 결과가 나올 때까지 기다려 주세요.`
     : missing > 0 ? `업무 시간이 부족해요. 남은 시간 ${formatMinutes(state.remaining)} · 제출에 ${formatMinutes(cost)} 필요 · ${formatMinutes(missing)} 부족. ${followup}` : "";
   const nextButton = $("submit-next");
   nextButton.classList.toggle("hidden", !next || busy);
@@ -687,6 +714,7 @@ function submitChallenge(answer) {
     if (!canSubmit(state)) $("challenge-feedback").textContent = "업무 시간이 부족해요. 다음 근무 시간에 이어서 할 수 있어요.";
     return;
   }
+  presence.work();
   if (result.passed) {
     workDraft = null;
     if (state.ending) return endRun();
@@ -728,7 +756,11 @@ function renderOffice(focus = false, { reaction } = {}) {
   }
   const scene = officeScene(state, isFriday(state.day));
   if (isTutorial(state) && state.phase === "arrive") {
-    bossSay("신입, 이름이 뭐야?");
+    if (!state.playerName || !hasLanguageAssignment(state)) bossSay("신입, 이름이 뭐야?");
+    else if (!state.language) bossSay(`${state.playerName} 씨, 무슨 언어 할 줄 알아?`);
+    else bossSay(state.familiarLanguage === "none"
+      ? `그럼 ${LANGUAGES[state.language].name}부터 배워. 오늘 바로 써야 하거든.`
+      : `그래? 우리 팀은 ${LANGUAGES[state.language].name} 쓰는데. 처음이면 하면서 배우면 돼. 오늘까지야.`);
   } else if (scene) {
     playOfficeScene(scene);
   } else if (state.phase === "arrive") {
@@ -748,7 +780,7 @@ function renderOffice(focus = false, { reaction } = {}) {
       leave: BOSS_LINES.leave,
     })[state.phase] ?? "오늘 처리할 수 있는 일부터 보자.");
   }
-  if (isTutorial(state) && state.phase === "morning" && state.moves.length === 1 && !state.guideSeen && !officeGuide.open) {
+  if (isTutorial(state) && state.phase === "morning" && state.moves.length === (hasLanguageAssignment(state) ? 2 : 1) && !state.guideSeen && !officeGuide.open) {
     showOfficeGuide();
   }
 }
@@ -781,6 +813,8 @@ function enterOffice(resume = false) {
   workDraft = saved?.workDraft ?? null;
   internetState = saved?.internetState ?? newInternetState();
   companionState = saved?.companionState ?? newCompanionState();
+  presenceSeen = saved?.presenceSeen ?? [];
+  presence.reset();
   clockChecks = 0;
   $("player-name").value = state.playerName ?? "";
   if (saved?.state) {
@@ -798,7 +832,7 @@ function enterOffice(resume = false) {
   shownMission = null;
   shownChallenge = null;
   show("screen-office");
-  prepareWorker();
+  stopWorker({ unavailable: true });
   renderOffice(true);
 }
 
@@ -807,13 +841,18 @@ function output(text, kind = "") {
   $("output").className = kind;
 }
 
-let python;
+let runner;
 let pending;
 let jobId = 0;
+const RUNNERS = {
+  python: ["pyworker.js?v=5", false, 25000, 8000],
+  javascript: ["javascript-worker.js", true, 25000, 8000],
+  cpp: ["cpp-worker.js", true, 60000, 12000],
+};
 
 function stopWorker(result) {
-  python?.worker.terminate();
-  python = null;
+  runner?.worker.terminate();
+  runner = null;
   if (pending) completeJob(result);
 }
 
@@ -824,55 +863,60 @@ function completeJob(result) {
   job.resolve(result);
 }
 
-function prepareWorker() {
-  if (python) return python;
-  const worker = new Worker("src/pyworker.js?v=4");
-  python = { worker, ready: false };
+function prepareWorker(language) {
+  if (runner?.language === language) return runner;
+  stopWorker({ unavailable: true });
+  const [script, module, startupMs, executionMs] = RUNNERS[language];
+  const worker = new Worker("src/" + script, module ? { type: "module" } : undefined);
+  runner = { worker, language, startupMs, executionMs, ready: false };
   worker.onmessage = ({ data }) => {
-    if (python?.worker !== worker) return;
+    if (runner?.worker !== worker) return;
     if (data.type === "ready") {
-      python.ready = true;
+      runner.ready = true;
       if (pending) sendJob();
     } else if (data.type === "unavailable") {
       stopWorker({ unavailable: true });
     } else if (pending && data.jobId === pending.id) completeJob(data);
   };
   worker.onerror = () => {
-    if (python?.worker === worker) stopWorker({ unavailable: true });
+    if (runner?.worker === worker) stopWorker({ unavailable: true });
   };
-  return python;
+  return runner;
 }
 
 function sendJob() {
   clearTimeout(pending.timer);
-  pending.timer = setTimeout(() => stopWorker({ timeout: true }), 8000);
-  python.worker.postMessage({ code: pending.code, check: pending.check, verify: pending.verify, jobId: pending.id });
+  pending.timer = setTimeout(() => stopWorker({ timeout: true }), runner.executionMs);
+  runner.worker.postMessage({ code: pending.code, check: pending.check, verify: pending.verify, jobId: pending.id });
 }
 
-function runPython(code, check, verify) {
+function runCode(language, code, check, verify) {
   return new Promise((resolve) => {
-    const interpreter = prepareWorker();
-    pending = { id: ++jobId, code, check, verify, resolve, timer: setTimeout(() => stopWorker({ unavailable: true }), 25000) };
+    const interpreter = prepareWorker(language);
+    pending = { id: ++jobId, code, check, verify, resolve, timer: setTimeout(() => stopWorker({ unavailable: true }), interpreter.startupMs) };
     if (interpreter.ready) sendJob();
   });
 }
 
-async function handlePython(submit) {
+async function handleCode(submit) {
   if (busy || (submit && !canSubmit(state))) return;
+  presence.work();
   busy = true;
   minesWindow.sync();
   renderChoices();
   renderCoding();
   $("office-title").disabled = true;
-  output("Python 실행 중…");
   const mission = currentMission(state);
+  const language = state.language ?? "python";
+  const label = LANGUAGES[language].name;
+  output(runner?.ready ? `${label} 실행 중…` : `${label} 실행기를 준비하고 있어요. 첫 실행은 조금 더 걸려요.`);
   const check = submit || mission.fromBank ? mission.check : null;
-  const result = await runPython(editor.value, check, submit).catch(() => ({ unavailable: true }));
+  const result = await runCode(language, editor.value, check, submit).catch(() => ({ unavailable: true }));
   busy = false;
   const retryMinutes = submit && !result.unavailable && (!result.ok || !result.passed) ? failCodeSubmission(state) : false;
   $("office-title").disabled = false;
-  if (result.unavailable) output("Python 실행기를 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 실행하세요.", "error");
-  else if (result.timeout) output("8초 동안 코드가 끝나지 않아 실행을 멈췄습니다. 반복문의 종료 조건을 확인하세요.", "error");
+  if (result.unavailable) output(`${label} 실행기를 불러오지 못했습니다. 연결을 확인한 뒤 다시 실행하세요.`, "error");
+  else if (result.timeout) output("실행 제한 시간에 도달했어요. 반복문의 종료 조건을 확인하세요.", "error");
   else if (!result.ok) output(result.error || "실행 오류가 발생했습니다.", "error");
   else if (mission.fromBank) {
     const lines = [result.stdout.trimEnd(), `공개 테스트 ${result.publicPassed}/${result.publicTotal} 통과`];
@@ -950,6 +994,7 @@ function showResult(record) {
   ]);
   rows.push([record.workResults ? "완료한 업무 미션" : "완료한 코딩 미션",
     record.scoreGoal ? `${record.progress}건 · 목표 ${record.missionTotal}건` : `${record.progress}/${record.missionTotal ?? MISSIONS.length}`]);
+  if (record.language) rows.push(["배정 언어", LANGUAGES[record.language].name]);
   if (record.scoreGoal) rows.push(["최종 인사평가", `${record.score} / ${record.scoreGoal}점`],
     ["배포 검수", record.deliverySubmitted ? "완료" : "미완료"], ["남은 추가 일감", `${record.scope}건`]);
   rows.push(...workResultRows(record));
@@ -970,6 +1015,7 @@ function showResult(record) {
 
 function endRun() {
   clearTimeout(idle);
+  stopWorker({ unavailable: true });
   bossVersion++;
   saveLocal(RUN_KEY, null);
   const record = recordFor(state);
@@ -1006,6 +1052,7 @@ function endRun() {
 
 function title() {
   clearTimeout(idle);
+  stopWorker({ unavailable: true });
   bossVersion++;
   show("screen-title");
   const saved = loadLocal(RUN_KEY);
@@ -1037,7 +1084,8 @@ $("name-form").onsubmit = (event) => {
     return;
   }
   state.playerName = name;
-  takeOfficeAction("arrive");
+  if (hasLanguageAssignment(state)) renderOffice(true);
+  else takeOfficeAction("arrive");
 };
 $("player-name").oninput = (event) => event.currentTarget.setCustomValidity("");
 nextOfficeLine.onclick = advanceOfficeScene;
@@ -1059,8 +1107,8 @@ $("office-clock").onclick = () => {
 };
 $("office-title").onclick = title;
 $("ending-title-link").onclick = title;
-$("btn-run").onclick = () => handlePython(false);
-$("btn-submit").onclick = () => handlePython(true);
+$("btn-run").onclick = () => handleCode(false);
+$("btn-submit").onclick = () => handleCode(true);
 $("challenge-submit").onclick = () => submitChallenge(readChallenge?.());
 function openWorkNote(id) {
   $(id).showModal();

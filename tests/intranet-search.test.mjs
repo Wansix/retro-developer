@@ -1,11 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CODE_PROBLEMS } from "../src/code-problems.js";
+import { materializeProblem } from "../src/code-problem-bank.js";
 import { INTRANET_DOCUMENTS, INTRANET_SITES } from "../src/intranet-documents.js";
 import {
   commentOnInternetSolution, currentInternetPage, goInternetBack, missionTopics, newInternetState,
   readInternetArticle, recordInternetSearch, searchIntranet, visitInternetPage,
 } from "../src/intranet-search.js";
+
+test("assigned-language searches cover bank topics and survive history reload", () => {
+  for (const language of ["javascript", "cpp"]) {
+    for (const { id, tags } of CODE_PROBLEMS) {
+      for (const topic of tags) assert.ok(searchIntranet(topic, tags, language).some(doc => doc.language === language), language + " " + id + " " + topic);
+    }
+    const mission = materializeProblem("code:inventory-list", 417, language);
+    const state = newInternetState();
+    recordInternetSearch(state, "배열", mission);
+    const page = currentInternetPage(JSON.parse(JSON.stringify(state)));
+    assert.equal(page.language, language);
+    assert.ok(searchIntranet(page.query, page.topics, page.language).every(doc => doc.language === language));
+  }
+});
 
 test("the fictional library covers the problem tags and searches Korean, English, aliases, and errors", () => {
   assert.equal(INTRANET_DOCUMENTS.length, 18);

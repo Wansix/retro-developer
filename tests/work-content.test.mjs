@@ -5,6 +5,7 @@ import { MINE_BREAK_COST, MINE_WARNING_SECONDS, mineNeighbors } from "../src/min
 import { gradeWork, makeWork, WORK_TYPES, workOrder } from "../src/work-missions.js";
 import { formatDate, PROBLEM_BANK_RULESET, SHORT_PROJECT_RULESET, WORK_CONTENT_RULESET } from "../src/records-schema.js";
 import { PROJECT_GOAL, projectReady } from "../src/project-work.js";
+import { LANGUAGES, assignedLanguage } from "../src/office-languages.js";
 
 function sudokuSolutions(work) {
   const result = [];
@@ -247,7 +248,7 @@ test("code review and delegation have replayable costs, while the 10-day problem
 
 test("chained assignments use the remaining time and retain unfinished work the next day", () => {
   const run = newRun(417);
-  step(run, "arrive");
+  step(run, "stack-none", "arrive");
   assert.ok(submitSolution(run));
   const minutes = run.remaining;
   assert.equal(currentMission(run), undefined);
@@ -269,6 +270,33 @@ test("chained assignments use the remaining time and retain unfinished work the 
     step(run, "next", "leave", "arrive", "scrumQuick");
   }
   assert.equal(run.scrum.yesterday.workCount, 2);
+});
+
+test("first-day language assignment excludes the chosen language and persists through replay and resume", () => {
+  const all = Object.keys(LANGUAGES);
+  const unknownRolls = new Set();
+  for (let seed = 0; seed < 40; seed++) {
+    unknownRolls.add(assignedLanguage(seed, "none"));
+    for (const familiar of all) {
+      const run = newRun(seed);
+      assert.ok(!act(run, "arrive"));
+      step(run, "stack-" + familiar);
+      assert.equal(run.phase, "arrive");
+      assert.notEqual(run.language, familiar);
+      assert.equal(run.language, assignedLanguage(seed, familiar));
+      assert.ok(!act(run, "stack-none"));
+      step(run, "arrive");
+      const expected = currentMission(run);
+      assert.deepEqual(currentMission(JSON.parse(JSON.stringify(run))), expected);
+      assert.equal(expected.language ?? "python", run.language);
+    }
+  }
+  assert.equal(unknownRolls.size, all.length);
+  const run = newRun(512);
+  step(run, "stack-javascript", "arrive");
+  advance(run, true);
+  assert.equal(recordFor(run).language, run.language);
+  assert.deepEqual(replayRun(run), recordFor(run));
 });
 
 test("the 10-day project releases every template without duplicates and requires delivery, scope and score", () => {

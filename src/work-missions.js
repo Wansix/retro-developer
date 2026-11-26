@@ -1,9 +1,9 @@
 import { MISSIONS } from "./missions.js";
-import { problemOrder, materializeProblem } from "./code-problem-bank.js";
+import { problemOrder, materializeProblem, storyInLanguage } from "./code-problem-bank.js";
 import { seedValue, seededShuffle } from "./seeded.js";
 
 export const WORK_TYPES = {
-  code: "Python 코딩", quiz: "개발 퀴즈", review: "코드 리뷰", sudoku: "데이터 검증",
+  code: "코딩", quiz: "개발 퀴즈", review: "코드 리뷰", sudoku: "데이터 검증",
   lights: "서버 복구", memory: "레거시 분석", qa: "화면 비교", design: "UI 위치 수정",
 };
 
@@ -89,7 +89,7 @@ export function lightsAfter(mask, presses) {
   return mask;
 }
 
-export function makeWork(key, seed) {
+export function makeWork(key, seed, language = "python") {
   if (typeof key === "number") {
     const mission = MISSIONS[key];
     if (!mission) return;
@@ -97,9 +97,9 @@ export function makeWork(key, seed) {
   }
   if (Object.hasOwn(STORY_WORK, key)) {
     const { index, title } = STORY_WORK[key];
-    return { ...makeWork(index, seed), title };
+    return storyInLanguage({ ...makeWork(index, seed), title }, language);
   }
-  if (typeof key === "string" && key.startsWith("code:")) return materializeProblem(key, seed);
+  if (typeof key === "string" && key.startsWith("code:")) return materializeProblem(key, seed, language);
   const entry = NEW_WORK[key];
   if (!entry) return;
   const [notice, estimate, minutes] = entry;
@@ -112,11 +112,15 @@ export function makeWork(key, seed) {
       const [title, brief, choices, correct, hint, explanation] = QUIZZES[seedValue(seed, 11) % QUIZZES.length];
       return { ...work, title, brief, choices, correct, hint, explanation };
     }
-    case "review":
+    case "review": {
+      const declaration = language === "cpp" ? ["int", "double", "double"] : language === "javascript" ? ["var", "var", "var"] : ["", "", ""];
+      const line = (i, code) => declaration[i] ? declaration[i] + " " + code + ";" : code;
       return { ...work, title: "할인 계산 코드 리뷰", brief: "모든 상품은 정상가의 10%를 할인해야 해요. 결과를 잘못 계산하는 줄을 고르세요.",
-        choices: ["price = 10000", "discount = price * 0.10", "total = price + discount", "print(total)"], correct: 2,
+        choices: [line(0, "price = 10000"), line(1, "discount = price * 0.10"), line(2, "total = price + discount"),
+          language === "cpp" ? "std::cout << total;" : language === "javascript" ? "console.log(total);" : "print(total)"], correct: 2,
         hint: "정상가 10,000원에 10% 할인을 하면 9,000원이 나와야 해요.",
         explanation: "할인액을 정상가에 더하고 있어요. total = price - discount로 바꾸면 9,000원이 나와요." };
+    }
     case "sudoku": {
       const numbers = seededShuffle([1, 2, 3, 4], seed, 20);
       const clues = SUDOKU_CLUES.map(value => value ? numbers[value - 1] : 0);

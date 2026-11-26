@@ -1,6 +1,16 @@
 export const COMDORI_STANDBY = "관찰 기록을 준비했습니다.";
 
 export const COMDORI_LINES = {
+  lateLocal: {
+    priority: 2,
+    cooldown: 90000,
+    lines: ["현실에서도 야근 중이십니까? 이쪽 서버는 아직 아침으로 표시됩니다."],
+  },
+  longIdle: {
+    priority: 2,
+    cooldown: 90000,
+    lines: ["인간의 절전 모드가 감지되었습니다. 작성 중인 코드는 계속 보관합니다."],
+  },
   coding: {
     priority: 2,
     cooldown: 45000,

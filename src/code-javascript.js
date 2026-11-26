@@ -1,0 +1,76 @@
+export const JAVASCRIPT_PROBLEMS = {
+  deployment: {
+    hint: "배열을 훑으면서 하나라도 false라면 HOLD를 즉시 반환하세요.",
+    solution: ["for (var i = 0; i < results.length; i++) {",
+      '    if (!results[i]) return "HOLD";', "}", 'return "DEPLOY";'],
+  },
+  "desk-calculator": { solution: [
+    'if (op === "+") return a + b;', 'if (op === "-") return a - b;', 'if (op === "*") return a * b;',
+    'return b === 0 ? null : a / b;',
+  ] },
+  "atm-withdraw": { solution: ["if (amount > 0 && amount <= balance) return balance - amount;", "return balance;"] },
+  "number-baseball": { solution: [
+    "var strikes = 0, balls = 0;", "for (var i = 0; i < guess.length; i++) {",
+    "    if (guess.charAt(i) === secret.charAt(i)) strikes++;", "    else if (secret.indexOf(guess.charAt(i)) !== -1) balls++;", "}",
+    "return [strikes, balls];",
+  ] },
+  "office-rps": { solution: [
+    'if (player === opponent) return "DRAW";', 'var beats = { R: "S", P: "R", S: "P" };',
+    'return beats[player] === opponent ? "WIN" : "LOSE";',
+  ] },
+  "shipping-boundary": {
+    starter: ["if (total > threshold) return 0;", "return fee;"],
+    solution: ["return total >= threshold ? 0 : fee;"],
+  },
+  "lottery-draw": {
+    hint: "중복을 피하면서 모으고, sort(function (a, b) { return a - b; })로 숫자 순서대로 정렬하세요.",
+    solution: ["var picked = [], seen = {};", "for (var i = 0; i < candidates.length && picked.length < count; i++) {",
+      "    var n = candidates[i];", "    if (n >= 1 && n <= 45 && !seen[n]) { seen[n] = true; picked.push(n); }",
+      "}", "return picked.sort(function (a, b) { return a - b; });"],
+  },
+  "contacts-search": {
+    hint: "양끝 공백은 replace로, 대소문자는 toLowerCase()로 정리하세요. 양쪽 이름 모두 같은 규칙을 적용하세요.",
+    solution: [String.raw`function tidy(text) { return text.replace(/^\s+|\s+$/g, "").toLowerCase(); }`,
+      "for (var name in contacts) {", "    if (tidy(name) === tidy(query)) return contacts[name];", '}', 'return "";'],
+  },
+  "vending-change": {
+    hint: "Math.floor로 동전 개수를 정수로 만들고, 나머지 %로 다음 동전에 넘길 금액을 구하세요.",
+    solution: ["if (paid < price) return [];", "var units = [500, 100, 50, 10], coins = [], left = paid - price;",
+      "for (var i = 0; i < units.length; i++) {", "    coins.push(Math.floor(left / units[i]));",
+      "    left %= units[i];", "}", "return coins;"],
+  },
+  "inventory-list": { solution: ["var total = 0;", "for (var i = 0; i < stock.length; i++) {",
+    "    if (stock[i] > 0) total += stock[i];", "}", "return total;"] },
+  "order-sort": {
+    hint: "sort에 일반 함수를 넘기고 우선순위가 같을 때만 주문 번호를 비교하세요.",
+    solution: ["orders.sort(function (a, b) { return b[1] - a[1] || a[0] - b[0]; });",
+      "var ids = [];", "for (var i = 0; i < orders.length; i++) ids.push(orders[i][0]);", "return ids;"],
+  },
+  "tic-tac-toe": { solution: ["var lines = board.slice();",
+    "for (var i = 0; i < 3; i++) lines.push([board[0][i], board[1][i], board[2][i]]);",
+    "lines.push([board[0][0], board[1][1], board[2][2]], [board[0][2], board[1][1], board[2][0]]);",
+    "for (var j = 0; j < lines.length; j++) {", "    var row = lines[j];",
+    "    if (row[0] && row[0] === row[1] && row[1] === row[2]) return row[0];", "}", 'return "";'] },
+  "cart-coupon": {
+    starter: ["var total = 0;", "for (var i = 0; i < items.length; i++) total += items[i][0];", "return total;"],
+    hint: "각 항목에서 단가와 수량을 곱하고 쿠폰을 적용하세요. Math.max(0, total)로 음수를 막으세요.",
+    solution: ["var total = 0;", "for (var i = 0; i < items.length; i++) total += items[i][0] * items[i][1];",
+      "if (total >= threshold) total -= coupon;", "return Math.max(0, total);"],
+  },
+  "catalog-search": { solution: ["var left = 0, right = codes.length;", "while (left < right) {",
+    "    var mid = Math.floor((left + right) / 2);", "    if (codes[mid] < code) left = mid + 1;",
+    "    else right = mid;", "}", "return codes[left] === code ? left : -1;"] },
+  "inventory-reserve": {
+    hint: "새 객체에 재고를 복사하세요. 상품이 없을 때는 0으로 보고, 부족하면 null을 반환하세요.",
+    solution: ["var updated = {};", "for (var sku in stock) updated[sku] = stock[sku];",
+      "for (var key in order) {", "    if ((updated[key] || 0) < order[key]) return null;",
+      "    if (order[key]) updated[key] -= order[key];", "}", "return updated;"],
+  },
+  "duplicate-webhook": {
+    starter: ["var ordered = events.slice().sort(function (a, b) { return a - b; });",
+      "var result = [];", "for (var i = 0; i < ordered.length; i++) {",
+      "    if (i === 0 || ordered[i] !== ordered[i - 1]) result.push(ordered[i]);", "}", "return result;"],
+    solution: ["var seen = {}, result = [];", "for (var i = 0; i < events.length; i++) {",
+      "    var n = events[i];", "    if (!seen[n]) { seen[n] = true; result.push(n); }", "}", "return result;"],
+  },
+};

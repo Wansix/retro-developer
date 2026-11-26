@@ -81,8 +81,9 @@ export function mountOfficeCompanion({ getState, getShift, paused, onChange }) {
   }
 
   function emit(event) {
-    if (!timer || !queueCompanionEvent(getState(), event, Date.now(), getShift())) return;
+    if (!timer || !queueCompanionEvent(getState(), event, Date.now(), getShift())) return false;
     if (!tick()) onChange();
+    return true;
   }
 
   return { emit, sync, tick };

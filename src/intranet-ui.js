@@ -1,4 +1,5 @@
 import { INTRANET_SITES } from "./intranet-documents.js";
+import { LANGUAGES } from "./office-languages.js";
 import {
   currentInternetPage, documentById, documentMatchesTopics, goInternetBack,
   missionTopics, readInternetArticle, recordInternetSearch, searchIntranet, visitInternetPage,
@@ -74,7 +75,7 @@ export function mountIntranet({ getState, getMission, onChange, onComment }) {
 
   function home(mission) {
     const page = node("div", null, "internet-portal");
-    page.append(node("h3", "미래검색"), node("p", "개발 자료 검색과 사내 즐겨찾기"));
+    page.append(node("h3", "미래검색"), node("p", LANGUAGES[mission?.language ?? "python"].name + " 개발 자료와 사내 즐겨찾기"));
     const topics = missionTopics(mission).slice(0, 4);
     if (topics.length) {
       page.append(node("h4", "이 업무의 검색어"));
@@ -90,7 +91,7 @@ export function mountIntranet({ getState, getMission, onChange, onComment }) {
   }
 
   function results(page) {
-    const found = searchIntranet(page.query, page.topics);
+    const found = searchIntranet(page.query, page.topics, page.language);
     const resultPage = node("div", null, "internet-results");
     resultPage.append(node("h3", "‘" + page.query + "’ 검색 결과 " + found.length + "건"));
     if (!found.length) {
@@ -117,7 +118,7 @@ export function mountIntranet({ getState, getMission, onChange, onComment }) {
     const page = node("article", null, "internet-article");
     page.dataset.site = doc.site;
     const header = node("div", null, "internet-site");
-    header.append(node("strong", site.name), node("p", site.section));
+    header.append(node("strong", doc.language && doc.site === "manual" ? LANGUAGES[doc.language].name + " 한글 문서방" : site.name), node("p", site.section));
     const body = node("div", null, "internet-entry");
     const meta = node("p", doc.author + " · ", "internet-meta");
     const date = node("time", doc.date);
@@ -158,6 +159,8 @@ export function mountIntranet({ getState, getMission, onChange, onComment }) {
   }
 
   function paint(page, state, mission) {
+    query.placeholder = mission?.language === "cpp" ? "vector, undeclared identifier…" :
+      mission?.language === "javascript" ? "var, ReferenceError…" : "함수, TypeError…";
     $("internet-back").disabled = state.pages.length < 2;
     $("internet-home").disabled = page.view === "home";
     $("internet-history").disabled = page.view === "history";
