@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { act, canSubmit, currentMission, delegateCodeWork, failCodeSubmission, missionCount, missionNotice, newRun, options, playMinesAction, projectDay, recordFor, replayRun, requestCodeReview, submitSolution, submitSpecialWork } from "../src/office.js";
+import { DEBUG_PASS_MOVE, act, canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, missionCount, missionNotice, newRun, options, passWorkForDebug, playMinesAction, projectDay, recordFor, replayRun, requestCodeReview, submitSolution, submitSpecialWork } from "../src/office.js";
 import { MINE_BREAK_COST, MINE_WARNING_SECONDS, mineNeighbors } from "../src/mines.js";
 import { gradeWork, makeWork, WORK_TYPES, workOrder } from "../src/work-missions.js";
-import { formatDate, PROBLEM_BANK_RULESET, SHORT_PROJECT_RULESET, WORK_CONTENT_RULESET } from "../src/records-schema.js";
+import { formatDate, LANGUAGE_ASSIGNMENT_RULESET, PROBLEM_BANK_RULESET, SHORT_PROJECT_RULESET, WORK_CONTENT_RULESET } from "../src/records-schema.js";
 import { PROJECT_GOAL, projectReady } from "../src/project-work.js";
 import { LANGUAGES, assignedLanguage } from "../src/office-languages.js";
 
@@ -247,7 +247,7 @@ test("code review and delegation have replayable costs, while the 10-day problem
 });
 
 test("chained assignments use the remaining time and retain unfinished work the next day", () => {
-  const run = newRun(417);
+  const run = newRun(417, undefined, LANGUAGE_ASSIGNMENT_RULESET);
   step(run, "stack-none", "arrive");
   assert.ok(submitSolution(run));
   const minutes = run.remaining;
@@ -301,7 +301,7 @@ test("first-day language assignment excludes the chosen language and persists th
 
 test("the 10-day project releases every template without duplicates and requires delivery, scope and score", () => {
   for (const seed of [12, 417, 91231]) {
-    const run = newRun(seed);
+    const run = newRun(seed, undefined, LANGUAGE_ASSIGNMENT_RULESET);
     assert.equal(new Set(run.workOrder.map(job => job.key)).size, 22);
     for (const { day, key } of run.workOrder) {
       const difficulty = makeWork(key, seed).difficulty;
@@ -317,4 +317,45 @@ test("the 10-day project releases every template without duplicates and requires
     assert.equal(projectReady({ ...run, scope: 1 }), false);
     assert.equal(projectReady(run, PROJECT_GOAL.score - 1), false);
   }
+});
+
+test("the new curriculum uses six one-line grammar exercises through shift three and replays a complete run", () => {
+  const choices = new Set();
+  for (const seed of [12, 417, 91231, 24, 28, 83]) {
+    const run = newRun(seed);
+    const firstDays = run.workOrder.filter(({ day }) => day < 4);
+    assert.equal(new Set(run.workOrder.map(job => job.key)).size, 28);
+    for (const language of Object.keys(LANGUAGES)) {
+      const work = firstDays.map(({ key }) => makeWork(key, seed, language)).filter(({ type }) => type === "code");
+      assert.equal(work.length, 6);
+      for (const mission of work) {
+        choices.add(mission.id);
+        assert.ok(mission.fundamentals);
+        assert.equal(mission.difficultyLabel, "문법 연습");
+        assert.equal(mission.starter.match(/이 줄만 고치세요\./g)?.length, 1);
+        assert.ok(mission.minutes <= 35);
+      }
+    }
+    assert.ok(run.workOrder.filter(({ day }) => day >= 4).every(({ key }) => !makeWork(key, seed).fundamentals));
+    advance(run, true);
+    assert.ok(run.completedDay);
+    assert.equal(run.stats.overtime, 0);
+    assert.deepEqual(replayRun(run), recordFor(run));
+  }
+  assert.ok(choices.size > 6);
+});
+
+test("debug completion consumes the normal time and cannot be replayed for ranking", () => {
+  const run = newRun(417);
+  assert.equal(passWorkForDebug(run), false);
+  step(run, "stack-none", "arrive");
+  const expectedTime = run.remaining - codingCost(run);
+  assert.equal(passWorkForDebug(run), true);
+  assert.equal(run.remaining, expectedTime);
+  assert.equal(run.moves.at(-1), DEBUG_PASS_MOVE);
+  assert.equal(run.progress, 1);
+  assert.equal(passWorkForDebug(run), false);
+  advance(run, true);
+  assert.ok(run.completedDay);
+  assert.equal(replayRun(run), null);
 });

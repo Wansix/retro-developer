@@ -1,11 +1,11 @@
-import { BOSS_LINES, MISSIONS, PASTE_LINES, SCENE_2006, TRAVEL_LINES } from "./missions.js";
+import { BOSS_LINES, MISSIONS, PASTE_LINES, SCENE_2006, TRAVEL_LINES, WRONG_RUN_LINES } from "./missions.js";
 import { DEPARTMENTS, ENDINGS, EPILOGUE } from "./office-content.js";
 import { CAST_NAMES, officeScene } from "./office-scenes.js";
 import {
-  CLEANUP_MINUTES, CODE_DELEGATION, CODE_REVIEW_MINUTES, PHASES, RELATION_NAMES, act, canDelegateCode, canReviewCode,
+  CLEANUP_MINUTES, CODE_DELEGATION, CODE_REVIEW_MINUTES, DEBUG_PASS_MOVE, PHASES, RELATION_NAMES, act, canDelegateCode, canReviewCode,
   canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, hasDirectAssignments,
   hasChainedWork, hasLanguageAssignment, hasProblemBank, hasShortProject, hasWorkContent, isCoding, isFriday, isTutorial, missionCount,
-  missionNotice, needsAssignment, newRun, nextAssignment, options, projectDay, recordFor, recordPaste, requestCodeReview,
+  missionNotice, needsAssignment, newRun, nextAssignment, options, passWorkForDebug, projectDay, recordFor, recordPaste, requestCodeReview,
   submitSolution, submitSpecialWork,
 } from "./office.js";
 import { WORK_TYPES, workResultRows } from "./work-missions.js";
@@ -23,11 +23,15 @@ import { playIntro } from "./intro.js";
 import { OPENING_WORK, PROJECT_GOAL } from "./project-work.js";
 import { LANGUAGES } from "./office-languages.js";
 import { mountOfficePresence } from "./office-presence.js";
+import { mountCodeHighlight } from "./code-highlight.js";
 
 const $ = (id) => document.getElementById(id);
 const RUN_KEY = "retro-office-run-v1";
 const BEST_KEY = "retro-office-best-v1";
+const LOCAL_DEBUG = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
 const editor = $("editor");
+const paintEditor = mountCodeHighlight(editor, $("editor-highlight"));
+const coworkerHelp = $("coworker-help");
 let state;
 let draft = null;
 let workDraft = null;
@@ -42,9 +46,9 @@ let idle;
 let bossVersion = 0;
 let bossTyping;
 let clockChecks = 0;
+let wrongRunComments = 0;
 let clockPeekTimer;
 let clockPeekPhase;
-let guideTyping;
 let officeLines = [];
 let officeLineTimer;
 const officeGuide = $("office-guide");
@@ -74,6 +78,7 @@ function show(id) {
   window.scrollTo(0, 0);
   companion.sync(id === "screen-office");
   if (id !== "screen-office") intranet.sync(false);
+  if (id !== "screen-office" && coworkerHelp.matches(":popover-open")) coworkerHelp.hidePopover();
   minesWindow.sync();
 }
 
@@ -101,6 +106,21 @@ async function addChatTo(logId, text, who) {
   copy.append(label);
   div.append(copy);
   log.appendChild(div);
+  if (firstDay && who === "boss" && log.childElementCount === 1 && !officeReducedMotion.matches) {
+    log.parentElement.animate([
+      { transform: "translate(0, 0)" },
+      { transform: "translate(-7px, 3px)" },
+      { transform: "translate(6px, -2px)" },
+      { transform: "translate(-4px, 1px)" },
+      { transform: "translate(2px, 0)" },
+      { transform: "translate(0, 0)" },
+    ], { duration: 320, easing: "ease-out" });
+  }
+  if (firstDay && who === "me") {
+    copy.append(text);
+    log.scrollTop = log.scrollHeight;
+    return;
+  }
   await dialogueLine(copy, text, {
     voice: who,
     ...(firstDay ? { letterMs: 64, maxMs: 2400 } : {}),
@@ -134,7 +154,19 @@ function runScript(steps, logId, btnsId, onDone) {
       box.innerHTML = "";
       const b = document.createElement("button");
       b.className = "btn";
-      b.textContent = step.text;
+      if (logId === "chat-log-2006") {
+        b.classList.add("scene-reply");
+        const reply = document.createElement("span");
+        reply.textContent = step.text;
+        const action = document.createElement("span");
+        action.className = "prologue-cta-action";
+        action.textContent = "대답하기";
+        const arrow = document.createElement("span");
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.textContent = " →";
+        action.append(arrow);
+        b.append(reply, action);
+      } else b.textContent = step.text;
       b.onclick = async () => {
         box.innerHTML = "";
         await addChatTo(logId, step.text, "me");
@@ -188,13 +220,18 @@ function checkpoint() {
 const companion = mountOfficeCompanion({
   getState: () => companionState,
   getShift: () => state?.shift ?? 0,
-  paused: () => officeGuide.open || $("mission-help").open || $("challenge-help").open || !!state?.leisure?.warning,
+  paused: () => officeGuide.open || coworkerHelp.matches(":popover-open") || $("challenge-help").open || !!state?.leisure?.warning,
   onChange: checkpoint,
+  onLessonNext() {
+    companion.teach("input");
+    editor.focus({ preventScroll: true });
+  },
 });
 
 const presence = mountOfficePresence({
+  editor,
   active: () => !!state && hasLanguageAssignment(state) && $("screen-office").classList.contains("active") && isCoding(state.phase),
-  available: () => !busy && !!state.guideSeen && !officeLines.length && !document.querySelector("dialog[open]") &&
+  available: () => !busy && !officeLines.length && !document.querySelector("dialog[open]") && !coworkerHelp.matches(":popover-open") &&
     !state.leisure?.open && !$("office-scene").dataset.speaking,
   read: () => presenceSeen,
   save(kind) { presenceSeen.push(kind); checkpoint(); },
@@ -355,7 +392,7 @@ async function react(kind) {
 function resetIdle() {
   clearTimeout(idle);
   if (!state || hasLanguageAssignment(state)) return;
-  if (!officeGuide.open && !$("mission-help").open && !$("challenge-help").open && !state?.leisure?.open && !editor.disabled &&
+  if (!officeGuide.open && !coworkerHelp.matches(":popover-open") && !$("challenge-help").open && !state?.leisure?.open && !editor.disabled &&
     !$("coding-panel").classList.contains("internet-open") &&
     (!$("coding-panel").classList.contains("hidden") || !$("work-challenge").classList.contains("hidden"))) {
     idle = setTimeout(() => react("idle"), 45000);
@@ -396,6 +433,13 @@ function hud() {
   $("hud-hp").textContent = state.hp;
   $("bar-hp").style.width = `${state.hp}%`;
   const progress = Math.min(state.progress, missionCount(state));
+  const learning = isTutorial(state);
+  const leaving = state.phase === "leave" || state.phase === "overtime";
+  $("hud-dday").parentElement.classList.toggle("hidden", learning);
+  $("hud-hp").parentElement.classList.toggle("hidden", learning && !leaving);
+  $("hud-progress").parentElement.classList.toggle("hidden", learning && !progress);
+  $("hud-score").parentElement.classList.toggle("hidden", learning && !progress);
+  $("hud-scope").parentElement.classList.toggle("hidden", learning && !state.scope);
   $("hud-progress-label").textContent = hasChainedWork(state) ? "완료 업무" : "기능";
   $("hud-progress").textContent = `${progress}/${missionCount(state)}`;
   $("bar-progress").style.width = `${100 * progress / missionCount(state)}%`;
@@ -403,10 +447,12 @@ function hud() {
   $("hud-scope").textContent = `${state.scope}건`;
   $("hud-time-item").classList.toggle("hidden", !isCoding(state.phase));
   $("hud-time").textContent = formatMinutes(state.remaining);
-  $("hud-stress-item").classList.toggle("hidden", !hasWorkContent(state) || (isTutorial(state) && state.phase === "arrive"));
+  $("hud-stress-item").classList.toggle("hidden", !hasWorkContent(state) || (learning && state.phase !== "overtime" && state.stress < 75));
   $("hud-stress").textContent = state.stress ?? "";
-  $("mines-launch").classList.toggle("hidden", !hasWorkContent(state) || !isCoding(state.phase));
-  $("scrum-trust").classList.toggle("hidden", !state.scrum);
+  $("mines-launch").classList.toggle("hidden", !hasWorkContent(state) || !isCoding(state.phase) || (learning && !progress));
+  $("scrum-trust").classList.toggle("hidden", !state.scrum || learning);
+  $("relation-panel").classList.toggle("hidden", learning);
+  $("office-sidebar-toggle").textContent = learning ? "일정" : "일정·관계";
   if (state.scrum) $("hud-trust").textContent = `${state.stats.reportTrust}/100`;
   $("relations").replaceChildren(...Object.entries(RELATION_NAMES).flatMap(([id, name]) => {
     const dt = document.createElement("dt");
@@ -499,7 +545,43 @@ function phaseStory() {
       }
       return hasChainedWork(state) ? `오늘 ${state.workDoneToday}건 완료 · ${projectStatus()}` :
         `기능 ${state.progress}/${missionCount(state)} · 추가 일감 ${state.scope}건. 김 과장이 현황을 묻는다.`;
-    case "leave": return hasChainedWork(state) ? projectStatus() : "김 과장이 벽시계를 한 번 보고 자리에 앉는다.";
+    case "leave": {
+      if (isTutorial(state)) return "남은 업무는 다음 출근 때 이어서 할 수 있다.";
+      return hasChainedWork(state) ? projectStatus() : "김 과장이 벽시계를 한 번 보고 자리에 앉는다.";
+    }
+  }
+}
+
+function firstDayLesson() {
+  if (!isTutorial(state)) return null;
+  if (state.phase === "leave") return "신입, 남은 건 내일 봐도 돼. 오늘 더 하고 갈 거야?";
+  if (state.phase === "overtime" && state.moves.at(-1) === "stay") {
+    return "더 한다고? 알았어. 컵라면은 비품 창고에 있어.";
+  }
+  if (state.phase !== "morning") return null;
+  if (state.solvedToday && (state.workDoneToday ?? 1) === 1) {
+    if (state.moves.at(-1) === "code-delegate") return "이 대리가 끝냈어. 다음에 비슷한 거 들어오면 같이 봐.";
+    return "첫 검수 통과야. 손 좀 풀렸으면 다음 일도 하나 줄게.";
+  }
+  if (state.hint && state.moves.at(-1) === "tutorialHelp") return "이 대리가 참고할 글 줬지? 예제 한번 보고 와.";
+  if (currentMission(state)?.id === MISSIONS[0].id && !state.solvedToday) {
+    return "신입, Hello, World! 한 줄 찍어 봐. 나도 첫날엔 이거부터 했어.";
+  }
+  return null;
+}
+
+function currentLesson() {
+  if (isTutorial(state)) {
+    if (state.phase === "leave") return "health";
+    if (state.phase === "overtime") return "stress";
+    if (state.phase === "morning") {
+      const mission = currentMission(state);
+      if (state.solvedToday && (state.workDoneToday ?? 1) === 1) return "score";
+      if (mission?.id === MISSIONS[0].id && !state.solvedToday) return "time";
+      if (mission?.fundamentals) return "practice";
+    }
+  } else if (state.shift === 2) {
+    return { scrum: "trust", negotiate: "scope", report: "deadline" }[state.phase];
   }
 }
 
@@ -568,8 +650,9 @@ function takeOfficeAction(id) {
     endRun();
     return;
   }
+  if (id.startsWith("stack-")) preloadCpp();
   renderOffice(true, { reaction: id === "coffee" ? "coffee" : null });
-  if (id === "tutorialHelp") openWorkNote("mission-help");
+  if (id === "tutorialHelp") intranet.openHome();
   if (id === "stay") companion.emit("overtime");
   if (id === "leave") companion.emit("leave");
   if (state.stats.meetings - previousMeetings >= 40) companion.emit("meetingLong");
@@ -608,9 +691,8 @@ function renderChoices() {
 function renderCodingSupport(mission) {
   const fromBank = !!mission.fromBank;
   const reviewed = fromBank && state.reviewedProblem === mission.id;
-  $("mission-support").classList.toggle("hidden", !hasProblemBank(state));
-  $("mission-bank-meta").classList.toggle("hidden", !fromBank && !hasLanguageAssignment(state));
-  $("mission-public-tests").classList.toggle("hidden", !fromBank);
+  $("coworker-help-open").classList.toggle("hidden", !hasProblemBank(state));
+  $("coworker-help-open").disabled = busy;
   $("mission-review-code").classList.toggle("hidden", !fromBank || reviewed);
   $("mission-review-code").disabled = busy || !canReviewCode(state);
   $("mission-review-code").textContent = `이 대리에게 검토받기 · ${formatMinutes(CODE_REVIEW_MINUTES)}`;
@@ -627,6 +709,7 @@ function renderCoding() {
   const visible = isCoding(state.phase) && mission && (!mission.type || mission.type === "code") && !state.solvedToday;
   $("coding-panel").classList.toggle("hidden", !visible);
   intranet.sync(!!visible);
+  if ((!visible || shownMission !== mission.id) && coworkerHelp.matches(":popover-open")) coworkerHelp.hidePopover();
   if (!visible) {
     clearTimeout(idle);
     return;
@@ -634,21 +717,15 @@ function renderCoding() {
   if (shownMission !== mission.id) {
     shownMission = mission.id;
     $("mission-title").textContent = mission.title;
-    $("mission-brief").textContent = mission.brief;
-    $("mission-grammar").textContent = mission.grammar;
-    $("mission-example").textContent = mission.example;
-    $("mission-example-out").textContent = mission.exampleOut ?? "";
-    $("mission-example-out").classList.toggle("hidden", !mission.exampleOut);
     $("mission-req").textContent = mission.requirement;
     $("mission-expected").textContent = mission.expectedOut;
-    const languageName = LANGUAGES[state.language ?? "python"].name;
-    $("mission-bank-meta").textContent = mission.fromBank
-      ? [languageName, mission.difficultyLabel, mission.tags.join(", "), mission.reward && `완료 시 인사평가 +${mission.reward.score}`].filter(Boolean).join(" · ")
-      : languageName;
-    replaceList($("mission-public-cases"), mission.publicExamples ?? []);
+    const language = state.language ?? "python";
+    $("editor-file").textContent = LANGUAGES[language].file;
     $("mission-delegation-options").open = false;
-    $("hint-box").textContent = mission.hint;
     editor.value = draft?.id === mission.id ? draft.code : mission.starter;
+    editor.scrollTop = 0;
+    editor.scrollLeft = 0;
+    paintEditor(language);
     $("paste-warning").textContent = "";
     output("실행 버튼을 눌러 결과를 확인하세요.");
   }
@@ -656,6 +733,7 @@ function renderCoding() {
   const cost = codingCost(state);
   $("btn-submit").textContent = `업무 제출 · ${formatMinutes(cost)}`;
   $("btn-submit").disabled = busy || !canSubmit(state);
+  $("code-debug-pass").disabled = busy || !canSubmit(state);
   const missing = cost - state.remaining;
   const next = submissionNextAction(options(state));
   const followup = isTutorial(state) && state.phase === "morning"
@@ -696,6 +774,7 @@ function renderWorkChallenge() {
   const cost = codingCost(state);
   $("challenge-submit").textContent = `업무 제출 · ${formatMinutes(cost)}`;
   $("challenge-submit").disabled = !canSubmit(state);
+  $("challenge-debug-pass").disabled = !canSubmit(state);
   $("challenge-status").textContent = state.remaining < cost ? `남은 시간 ${formatMinutes(state.remaining)} · 제출에 ${formatMinutes(cost)} 필요` : "";
   const next = submissionNextAction(options(state));
   $("challenge-next").classList.toggle("hidden", !next);
@@ -719,7 +798,7 @@ function submitChallenge(answer) {
     workDraft = null;
     if (state.ending) return endRun();
     renderOffice(true);
-    bossSay("검수 통과야. 수고했어, 신입.");
+    if (!isTutorial(state)) bossSay("검수 통과야. 수고했어, 신입.");
   } else {
     $("challenge-feedback").textContent = `검수 실패 · 업무 시간 ${result.minutes}분 사용. 이 대리의 힌트를 참고해 다시 해 보세요.`;
     hud();
@@ -744,6 +823,7 @@ function renderOffice(focus = false, { reaction } = {}) {
     : "mission-title";
   $("screen-office").classList.toggle("office-active-work", !!activePane);
   minesWindow.sync();
+  companion.teach(currentLesson());
   checkpoint();
   if (focus) {
     let target = $("name-form").classList.contains("hidden") ? activePane ?? "shift-title" : "player-name";
@@ -754,13 +834,16 @@ function renderOffice(focus = false, { reaction } = {}) {
     react(reaction);
     return;
   }
+  const lesson = firstDayLesson();
   const scene = officeScene(state, isFriday(state.day));
   if (isTutorial(state) && state.phase === "arrive") {
     if (!state.playerName || !hasLanguageAssignment(state)) bossSay("신입, 이름이 뭐야?");
     else if (!state.language) bossSay(`${state.playerName} 씨, 무슨 언어 할 줄 알아?`);
     else bossSay(state.familiarLanguage === "none"
-      ? `그럼 ${LANGUAGES[state.language].name}부터 배워. 오늘 바로 써야 하거든.`
+      ? `한국어는 나도 해, 신입. 우리 팀은 ${LANGUAGES[state.language].name} 써. 오늘부터 배워.`
       : `그래? 우리 팀은 ${LANGUAGES[state.language].name} 쓰는데. 처음이면 하면서 배우면 돼. 오늘까지야.`);
+  } else if (lesson) {
+    bossSay(lesson);
   } else if (scene) {
     playOfficeScene(scene);
   } else if (state.phase === "arrive") {
@@ -773,22 +856,16 @@ function renderOffice(focus = false, { reaction } = {}) {
   } else {
     bossSay(({
       scrum: hasDirectAssignments(state) && state.shift === 2
-        ? "어제 작업은 내가 봤어. 자, 오늘 할 일 줄게."
+        ? "오늘부터 스크럼이야. 어제 한 일이랑 오늘 할 일, 짧게 말해 봐."
         : "신입, 어제 뭐 했고 오늘 뭐 할 거야? 막힌 게 있으면 같이 말해줘.",
       assign: hasWorkContent(state) ? "신입, 오늘은 이 건 좀 봐줘. 자세한 건 업무 받으면 확인해." : "인원은 그대로고 할 일은 늘었어. 업무표 보고 이야기하자.",
       report: "문제가 있으면 지금 말해줘. 그래야 나도 위에 보고할 수 있어.",
       leave: BOSS_LINES.leave,
     })[state.phase] ?? "오늘 처리할 수 있는 일부터 보자.");
   }
-  if (isTutorial(state) && state.phase === "morning" && state.moves.length === (hasLanguageAssignment(state) ? 2 : 1) && !state.guideSeen && !officeGuide.open) {
-    showOfficeGuide();
-  }
 }
 
 function showOfficeGuide() {
-  const portrait = $("guide-comdori");
-  const line = $("office-guide-line");
-  line.replaceChildren();
   $("guide-stress-label").classList.toggle("hidden", !hasWorkContent(state));
   $("guide-stress-copy").classList.toggle("hidden", !hasWorkContent(state));
   $("guide-deadline-copy").textContent = hasChainedWork(state)
@@ -796,14 +873,8 @@ function showOfficeGuide() {
     : hasShortProject(state)
     ? `주말을 빼고 근무일 ${PROJECT_WORKDAYS}일 안에 프로젝트를 끝내세요.`
     : `${TOTAL_DAYS}일 안에 프로젝트를 끝내면 2026년으로 돌아가요.`;
-  bossTyping?.abort();
   officeGuide.showModal();
   resetIdle();
-  guideTyping = new AbortController();
-  portrait.dataset.action = "talking";
-  dialogueLine(line, "들리세요? 2006년에선 화면 위 숫자부터 챙기세요.", {
-    voice: "ai", letterMs: 32, maxMs: 1450, signal: guideTyping.signal,
-  }).then(() => { portrait.dataset.action = "idle"; });
 }
 
 function enterOffice(resume = false) {
@@ -816,6 +887,7 @@ function enterOffice(resume = false) {
   presenceSeen = saved?.presenceSeen ?? [];
   presence.reset();
   clockChecks = 0;
+  wrongRunComments = 0;
   $("player-name").value = state.playerName ?? "";
   if (saved?.state) {
     state.ruleset ??= FIRST_RULESET;
@@ -833,6 +905,7 @@ function enterOffice(resume = false) {
   shownChallenge = null;
   show("screen-office");
   stopWorker({ unavailable: true });
+  preloadCpp();
   renderOffice(true);
 }
 
@@ -845,10 +918,16 @@ let runner;
 let pending;
 let jobId = 0;
 const RUNNERS = {
-  python: ["pyworker.js?v=5", false, 25000, 8000],
+  python: ["pyworker.js?v=6", false, 25000, 8000],
   javascript: ["javascript-worker.js", true, 25000, 8000],
-  cpp: ["cpp-worker.js", true, 60000, 12000],
+  cpp: ["cpp-worker.js?v=2", true, 60000, 12000],
 };
+
+function preloadCpp() {
+  if (state.language !== "cpp") return;
+  try { prepareWorker("cpp", true); }
+  catch { /* 실행을 누르면 일반 경로로 다시 시작한다. */ }
+}
 
 function stopWorker(result) {
   runner?.worker.terminate();
@@ -863,7 +942,7 @@ function completeJob(result) {
   job.resolve(result);
 }
 
-function prepareWorker(language) {
+function prepareWorker(language, prewarm = false) {
   if (runner?.language === language) return runner;
   stopWorker({ unavailable: true });
   const [script, module, startupMs, executionMs] = RUNNERS[language];
@@ -871,7 +950,9 @@ function prepareWorker(language) {
   runner = { worker, language, startupMs, executionMs, ready: false };
   worker.onmessage = ({ data }) => {
     if (runner?.worker !== worker) return;
-    if (data.type === "ready") {
+    if (data.type === "ready" && prewarm && !pending) {
+      worker.postMessage({ type: "warmup" });
+    } else if (data.type === "ready" || data.type === "warmed") {
       runner.ready = true;
       if (pending) sendJob();
     } else if (data.type === "unavailable") {
@@ -906,15 +987,17 @@ async function handleCode(submit) {
   renderChoices();
   renderCoding();
   $("office-title").disabled = true;
+  $("office-guide-open").disabled = true;
   const mission = currentMission(state);
   const language = state.language ?? "python";
   const label = LANGUAGES[language].name;
   output(runner?.ready ? `${label} 실행 중…` : `${label} 실행기를 준비하고 있어요. 첫 실행은 조금 더 걸려요.`);
-  const check = submit || mission.fromBank ? mission.check : null;
-  const result = await runCode(language, editor.value, check, submit).catch(() => ({ unavailable: true }));
+  const result = await runCode(language, editor.value, mission.check, submit).catch(() => ({ unavailable: true }));
   busy = false;
+  const wrongRun = !submit && result.ok && result.passed === false;
   const retryMinutes = submit && !result.unavailable && (!result.ok || !result.passed) ? failCodeSubmission(state) : false;
   $("office-title").disabled = false;
+  $("office-guide-open").disabled = false;
   if (result.unavailable) output(`${label} 실행기를 불러오지 못했습니다. 연결을 확인한 뒤 다시 실행하세요.`, "error");
   else if (result.timeout) output("실행 제한 시간에 도달했어요. 반복문의 종료 조건을 확인하세요.", "error");
   else if (!result.ok) output(result.error || "실행 오류가 발생했습니다.", "error");
@@ -924,7 +1007,7 @@ async function handleCode(submit) {
     output(lines.filter(Boolean).join("\n"), result.passed ? "ok" : "error");
   }
   else if (submit && !result.passed) output(`${result.stdout.trimEnd()}\n\n검수 실패. 출력과 변수, 그리고 경계값 조건을 다시 확인하세요.`.trimStart(), "error");
-  else output(result.stdout || "(출력 없음)", "ok");
+  else output(result.stdout || "(출력 없음)", wrongRun ? "error" : "ok");
   if (retryMinutes) {
     output(`${$("output").textContent}\n재시도 업무 시간 −${retryMinutes}분`, "error");
     hud();
@@ -941,8 +1024,12 @@ async function handleCode(submit) {
     renderChoices();
     renderCoding();
     minesWindow.sync();
-    if (result.timeout || (!result.ok && !result.unavailable)) react("error");
-    if (!result.unavailable && (result.timeout || !result.ok || result.passed === false)) companion.emit("error");
+    if (!submit && result.passed && isTutorial(state) && mission.id === MISSIONS[0].id) companion.teach("submit");
+    if (wrongRun) bossSay(WRONG_RUN_LINES[wrongRunComments++ % WRONG_RUN_LINES.length]);
+    else {
+      if (result.timeout || (!result.ok && !result.unavailable)) react("error");
+      if (!result.unavailable && (result.timeout || !result.ok || result.passed === false)) companion.emit("error");
+    }
   }
 }
 
@@ -1019,14 +1106,17 @@ function endRun() {
   bossVersion++;
   saveLocal(RUN_KEY, null);
   const record = recordFor(state);
-  lastRecord = record;
-  const best = loadLocal(BEST_KEY);
-  if (record.completedDay && (!best || record.completedDay < best.completedDay)) saveLocal(BEST_KEY, record);
-  $("ending-sync").textContent = "";
+  const debug = state.moves.includes(DEBUG_PASS_MOVE);
+  lastRecord = debug ? null : record;
+  $("ending-sync").textContent = debug ? "디버그 회차는 기록에 저장되지 않습니다." : "";
   const version = ++syncVersion;
-  syncRecord(record, { ruleset: state.ruleset, id: state.id, seed: state.seed, moves: state.moves }).then((message) => {
-    if (version === syncVersion) $("ending-sync").textContent = message;
-  });
+  if (!debug) {
+    const best = loadLocal(BEST_KEY);
+    if (record.completedDay && (!best || record.completedDay < best.completedDay)) saveLocal(BEST_KEY, record);
+    syncRecord(record, { ruleset: state.ruleset, id: state.id, seed: state.seed, moves: state.moves }).then((message) => {
+      if (version === syncVersion) $("ending-sync").textContent = message;
+    });
+  }
   if (!ENDINGS[record.ending].cleared) return showResult(record);
 
   $("chat-log-twist").replaceChildren();
@@ -1066,8 +1156,21 @@ function title() {
     : legacy ? `이전 10일판 최고 기록 · ${legacy.score}점 · ${legacy.ending}` : "";
 }
 
-$("btn-start").onclick = () => {
+$("btn-start").onclick = async () => {
+  const thought = $("intro-thought-line");
+  const startAgent = $("intro-start-agent");
+  thought.replaceChildren();
+  startAgent.classList.add("hidden");
+  show("screen-intro-thought");
+  $("intro-thought-time").focus({ preventScroll: true });
+  await dialogueLine(thought, "로그인 오류 문구 하나만 고치면 퇴근이다. 컴돌이한테 맡겨 볼까?", {
+    voice: "me", letterMs: 42, maxMs: 1250,
+  });
+  startAgent.classList.remove("hidden");
+};
+$("intro-start-agent").onclick = () => {
   show("screen-intro");
+  $("intro-title").focus({ preventScroll: true });
   playIntro(startTravel);
 };
 $("btn-gotowork").onclick = () => enterOffice();
@@ -1089,16 +1192,11 @@ $("name-form").onsubmit = (event) => {
 };
 $("player-name").oninput = (event) => event.currentTarget.setCustomValidity("");
 nextOfficeLine.onclick = advanceOfficeScene;
-function dismissOfficeGuide(event) {
-  event.preventDefault();
-  guideTyping?.abort();
-  state.guideSeen = true;
-  officeGuide.close();
-  renderOffice();
+$("office-guide-open").onclick = showOfficeGuide;
+officeGuide.onclose = () => {
+  resetIdle();
   companion.tick();
-}
-officeGuide.querySelector("form").onsubmit = dismissOfficeGuide;
-officeGuide.oncancel = dismissOfficeGuide;
+};
 $("office-clock").onclick = () => {
   peekAtClock();
   const naming = isTutorial(state) && state.phase === "arrive";
@@ -1110,11 +1208,19 @@ $("ending-title-link").onclick = title;
 $("btn-run").onclick = () => handleCode(false);
 $("btn-submit").onclick = () => handleCode(true);
 $("challenge-submit").onclick = () => submitChallenge(readChallenge?.());
-function openWorkNote(id) {
-  $(id).showModal();
-  resetIdle();
+if (LOCAL_DEBUG) {
+  for (const id of ["code-debug-pass", "challenge-debug-pass"]) {
+    const button = $(id);
+    button.classList.remove("hidden");
+    button.onclick = () => {
+      if (busy || !passWorkForDebug(state)) return;
+      draft = null;
+      workDraft = null;
+      if (state.ending) endRun();
+      else renderOffice(true);
+    };
+  }
 }
-$("mission-help-open").onclick = () => openWorkNote("mission-help");
 $("mission-review-code").onclick = () => {
   if (busy || !requestCodeReview(state)) return;
   hud();
@@ -1124,12 +1230,16 @@ $("mission-review-code").onclick = () => {
 };
 $("mission-delegate").onclick = () => {
   if (busy || !delegateCodeWork(state)) return;
-  $("mission-help").close();
+  coworkerHelp.hidePopover();
   draft = null;
   renderOffice(true);
 };
-$("challenge-help-open").onclick = () => openWorkNote("challenge-help");
-$("mission-help").onclose = $("challenge-help").onclose = resetIdle;
+$("challenge-help-open").onclick = () => {
+  $("challenge-help").showModal();
+  resetIdle();
+};
+$("challenge-help").onclose = resetIdle;
+coworkerHelp.ontoggle = resetIdle;
 compactOffice.addEventListener("change", syncOfficeSidebar);
 syncOfficeSidebar();
 

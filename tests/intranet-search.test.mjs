@@ -5,8 +5,21 @@ import { materializeProblem } from "../src/code-problem-bank.js";
 import { INTRANET_DOCUMENTS, INTRANET_SITES } from "../src/intranet-documents.js";
 import {
   commentOnInternetSolution, currentInternetPage, goInternetBack, missionTopics, newInternetState,
-  readInternetArticle, recordInternetSearch, searchIntranet, visitInternetPage,
+  readInternetArticle, recommendedIntranetArticles, recordInternetSearch, searchIntranet, visitInternetPage,
 } from "../src/intranet-search.js";
+
+test("the work page recommends only articles for the current language and topics", () => {
+  for (const language of ["python", "javascript", "cpp"]) {
+    const mission = materializeProblem("code:grammar-stock-status", 417, language);
+    const articles = recommendedIntranetArticles(mission);
+    assert.ok(articles.length > 0 && articles.length <= 3);
+    for (const article of articles) {
+      assert.equal(article.language ?? "python", language);
+      assert.ok(article.tags.some(tag => mission.tags.includes(tag)));
+    }
+  }
+  assert.deepEqual(recommendedIntranetArticles(null), []);
+});
 
 test("assigned-language searches cover bank topics and survive history reload", () => {
   for (const language of ["javascript", "cpp"]) {

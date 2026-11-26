@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { CODE_PROBLEMS } from "../src/code-problems.js";
+import { FUNDAMENTAL_DAYS } from "../src/code-fundamentals.js";
 import { materializeProblem, problemOrder } from "../src/code-problem-bank.js";
 import { makeWork, problemBankWorkOrder } from "../src/work-missions.js";
 
@@ -36,7 +37,7 @@ test("banks draw all tiers without duplicates, preserve the story slots, and var
 test("the sample solutions pass all public and hidden cases for 24 variants per template", () => {
   const grader = readFileSync(new URL("../src/pyworker.js", import.meta.url), "utf8").match(/const BANK_CHECK = `([\s\S]*?)`;/)?.[1];
   assert.ok(grader);
-  const work = CODE_PROBLEMS.flatMap(({ id }) => Array.from({ length: 24 }, (_, seed) => {
+  const work = [...CODE_PROBLEMS, ...FUNDAMENTAL_DAYS.flat(2)].flatMap(({ id }) => Array.from({ length: 24 }, (_, seed) => {
     const { check, solution } = materializeProblem("code:" + id, seed);
     return { id, seed, check, solution };
   }));

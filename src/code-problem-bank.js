@@ -3,13 +3,14 @@ import { seedValue, seededShuffle } from "./seeded.js";
 import { formatMinutes } from "./records-schema.js";
 import { JAVASCRIPT_PROBLEMS } from "./code-javascript.js";
 import { CPP_PROBLEMS, cppLiteral } from "./code-cpp.js";
+import { FUNDAMENTAL_DAYS } from "./code-fundamentals.js";
 
 export const DIFFICULTIES = {
   beginner: { label: "기초", minutes: 45, reward: { score: 14, hp: -3, stress: -4 } },
   intermediate: { label: "응용", minutes: 60, reward: { score: 16, hp: -3, stress: -4 } },
   advanced: { label: "구현·디버깅", minutes: 75, reward: { score: 19, hp: -3, stress: -4 } },
 };
-const problems = new Map(CODE_PROBLEMS.map(problem => ["code:" + problem.id, problem]));
+const problems = new Map([...CODE_PROBLEMS, ...FUNDAMENTAL_DAYS.flat(2)].map(problem => ["code:" + problem.id, problem]));
 
 export function problemOrder(seed) {
   return Object.keys(DIFFICULTIES).map((difficulty, index) => {
@@ -38,7 +39,9 @@ export function materializeProblem(id, seed, language = "python") {
   const template = problems.get(id);
   if (!template) return;
   const { difficulty, signature, title, tags, brief, contract, hint } = template;
-  const { label, minutes, reward } = DIFFICULTIES[difficulty];
+  const { reward } = DIFFICULTIES[difficulty];
+  const minutes = template.minutes ?? DIFFICULTIES[difficulty].minutes;
+  const label = template.fundamentals ? "문법 연습" : DIFFICULTIES[difficulty].label;
   const entry = signature.split("(")[0];
   let variantSalt = [...id].reduce((hash, char) => Math.imul(hash, 31) + char.charCodeAt(0) | 0, 0);
   const randomInt = (min, max) => min + seedValue(seed, variantSalt++) % (max - min + 1);
@@ -50,7 +53,8 @@ export function materializeProblem(id, seed, language = "python") {
     id, type: "code", fromBank: true, title, notice: title,
     boss: "신입, ‘" + title + "’ 건이야. 작업 범위는 편집기 옆에 적어 뒀어.",
     brief, difficulty, difficultyLabel: label, tags, minutes, estimate: formatMinutes(minutes), reward,
-    requirement: contract, grammar: "지정된 함수가 값을 반환해야 해요. print()는 결과를 확인할 때 쓰세요.",
+    ...(template.fundamentals ? { fundamentals: true } : {}),
+    requirement: contract, grammar: template.grammar ?? "지정된 함수가 값을 반환해야 해요. print()는 결과를 확인할 때 쓰세요.",
     starter: body(template.starter ?? ["# 아래 pass를 지우고 핵심 기능을 구현하세요.", "pass"]) + "\nprint(" + call(example.args) + ")\n",
     hint, example: "print(" + call(example.args) + ")", exampleOut: pythonLiteral(example.expected),
     expectedOut: pythonLiteral(example.expected),
@@ -63,7 +67,7 @@ export function materializeProblem(id, seed, language = "python") {
 
 function localizeCodeWork(work, template, cases, language) {
   const cpp = language === "cpp";
-  const version = cpp ? CPP_PROBLEMS[template.id] : JAVASCRIPT_PROBLEMS[template.id];
+  const version = template.variants?.[language] ?? (cpp ? CPP_PROBLEMS[template.id] : JAVASCRIPT_PROBLEMS[template.id]);
   const names = template.signature.split("(")[1].slice(0, -1).split(", ");
   const entry = work.check.name;
   const signature = cpp ? version.result + " " + entry + "(" +
@@ -76,8 +80,8 @@ function localizeCodeWork(work, template, cases, language) {
     ...work, language,
     requirement: version.contract ?? work.requirement.replaceAll("None", cpp ? "nullopt" : "null")
       .replaceAll(/딕셔너리|사전/g, cpp ? "map" : "객체"),
-    grammar: cpp ? "지정된 함수가 값을 반환해야 해요. 실행하면 공개 테스트의 실제 값과 기대 값을 확인할 수 있어요." :
-      "var와 일반 함수(function)를 쓰세요. console.log()로 출력을 확인하고, 정답은 return으로 돌려주세요.",
+    grammar: version.grammar ?? (cpp ? "지정된 함수가 값을 반환해야 해요. 실행하면 공개 테스트의 실제 값과 기대 값을 확인할 수 있어요." :
+      "var와 일반 함수(function)를 쓰세요. console.log()로 출력을 확인하고, 정답은 return으로 돌려주세요."),
     starter: body(version.starter ?? ["// 여기에 기능을 구현하세요.", cpp ? "return {};" : "return null;"]),
     solution: body(version.solution),
     example: call(cases.public[0].args),

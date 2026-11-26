@@ -15,6 +15,7 @@ export function playIntro(onDone) {
   const speak = document.getElementById("intro-speak");
   const speakLabel = document.getElementById("intro-speak-label");
   const speakText = document.getElementById("intro-speak-text");
+  const speakAction = document.getElementById("intro-speak-action");
   const preview = document.getElementById("intro-preview");
   const previewAddress = document.getElementById("intro-preview-address");
   const loginCard = document.getElementById("intro-preview-login-card");
@@ -73,7 +74,7 @@ export function playIntro(onDone) {
     const row = document.createElement("div");
     row.className = `intro-row intro-${kind}`;
     const label = document.createElement("span");
-    label.className = "intro-marker";
+    label.className = kind === "reply" || kind === "prompt" ? "intro-speaker" : "intro-marker";
     label.textContent = marker;
     const content = document.createElement(kind === "output" ? "pre" : "p");
     content.textContent = text;
@@ -88,8 +89,10 @@ export function playIntro(onDone) {
     comdori.dataset.action = "idle";
     status.textContent = "내 차례";
     status.dataset.activity = "waiting";
-    speakLabel.textContent = checking ? "화면에서 확인하기" : "내가 말하기";
+    speakLabel.textContent = checking ? "미리보기 테스트" : "보낼 지시";
     speakText.textContent = step.text;
+    speakAction.textContent = checking ? "확인하기" : "지시 보내기";
+    speak.classList.remove("hidden");
     speak.disabled = false;
     if (desktop) speak.focus({ preventScroll: true });
     latest();
@@ -104,7 +107,7 @@ export function playIntro(onDone) {
           showPreview(step.preview);
           append("↳", "output", `미리보기 · ${error.textContent}`).dataset.tone = error.dataset.tone;
         } else {
-          append("›", "prompt", step.text);
+          append("나", "prompt", step.text);
         }
         status.textContent = "작업 중";
         status.dataset.activity = "working";
@@ -118,15 +121,19 @@ export function playIntro(onDone) {
 
   async function replyToPlayer(text) {
     comdori.dataset.action = "talking";
-    const reply = append("◆", "reply", "컴돌이 · ");
+    const reply = append("컴돌이", "reply");
     await dialogueLine(reply, text, { voice: "ai", onFrame: latest });
     comdori.dataset.action = "idle";
   }
 
   async function run() {
     transcript.replaceChildren();
+    preview.classList.add("hidden");
+    speak.classList.add("hidden");
     showPreview("baseline");
-    append("$", "tool", "comdori");
+    status.textContent = "연결됨";
+    status.dataset.activity = "";
+    await replyToPlayer("어떤 작업을 할까요?");
     for (const step of PROLOGUE_2026) {
       if (step.who === "me" || step.who === "check") {
         await waiting(step);
@@ -151,8 +158,13 @@ export function playIntro(onDone) {
         } else if (tone) result.dataset.tone = tone;
         await pause(80);
       }
-      if (step.preview) showPreview(step.preview);
+      const revealPreview = step.preview && preview.classList.contains("hidden");
+      if (step.preview && !revealPreview) showPreview(step.preview);
       if (step.text) await replyToPlayer(step.text);
+      if (revealPreview) {
+        showPreview(step.preview);
+        preview.classList.remove("hidden");
+      }
     }
     status.textContent = "연결 종료";
     speakLabel.textContent = "연결 종료";

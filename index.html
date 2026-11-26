@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
-<title>옛날 개발자 v0.9.0 — 퇴근하고 싶다</title>
-<link rel="stylesheet" href="src/style.css?v=31">
+<title>옛날 개발자 v0.9.1 — 퇴근하고 싶다</title>
+<link rel="stylesheet" href="src/style.css?v=39">
 </head>
 <body>
   <!-- 타이틀 -->
   <section id="screen-title" class="screen active">
     <div class="terminal">
-      <h1>《옛날 개발자》 <span class="game-version">v0.9.0</span></h1>
+      <h1>《옛날 개발자》 <span class="game-version">v0.9.1</span></h1>
       <p class="sub">코딩은 쉬운데 퇴근이 어려운 게임.</p>
       <p class="line">2026년, 어느 개발자의 퇴근 2분 전.</p>
       <button id="btn-start" class="btn">게임 시작</button>
@@ -21,10 +21,18 @@
     </div>
   </section>
 
+  <section id="screen-intro-thought" class="screen" aria-labelledby="intro-thought-time">
+    <div class="intro-thought">
+      <h1 id="intro-thought-time" tabindex="-1">2026년 · 퇴근 2분 전</h1>
+      <p id="intro-thought-line"></p>
+      <button id="intro-start-agent" class="btn primary hidden" type="button">컴돌이 켜기 <span aria-hidden="true">→</span></button>
+    </div>
+  </section>
+
   <!-- 프롤로그 2026: AI와의 설전 -->
   <section id="screen-intro" class="screen" aria-labelledby="intro-title">
     <div class="intro-workbench">
-      <section id="intro-preview" class="intro-preview" data-state="baseline" aria-labelledby="intro-preview-title">
+      <section id="intro-preview" class="intro-preview hidden" data-state="baseline" aria-labelledby="intro-preview-title">
         <header class="intro-preview-toolbar">
           <h2 id="intro-preview-title">미리보기</h2>
           <code id="intro-preview-address">localhost:3000/login</code>
@@ -57,7 +65,7 @@
           <div class="intro-identity">
             <span id="intro-comdori" class="comdori-avatar" data-action="idle" aria-hidden="true"></span>
             <div>
-              <h1 id="intro-title">컴돌이</h1>
+              <h1 id="intro-title" tabindex="-1">컴돌이</h1>
               <p>코딩 에이전트</p>
             </div>
           </div>
@@ -69,9 +77,12 @@
         </div>
         <div id="intro-transcript" role="log" aria-label="터미널 작업 기록" tabindex="0"></div>
       </div>
-      <button id="intro-speak" type="button">
-        <span id="intro-speak-label">내가 말하기</span>
-        <strong id="intro-speak-text"></strong>
+      <button id="intro-speak" class="hidden" type="button">
+        <span class="intro-cta-copy">
+          <span id="intro-speak-label">입력 대기</span>
+          <strong id="intro-speak-text"></strong>
+        </span>
+        <span class="prologue-cta-action"><span id="intro-speak-action">지시 보내기</span> <span aria-hidden="true">→</span></span>
       </button>
     </div>
   </section>
@@ -95,7 +106,7 @@
   <!-- 타이틀 카드 -->
   <section id="screen-titlecard" class="screen">
     <div class="titlecard">
-      <h1 class="bigtitle">옛날 개발자 <span class="game-version">v0.9.0</span></h1>
+      <h1 class="bigtitle">옛날 개발자 <span class="game-version">v0.9.1</span></h1>
       <p class="tagline">미래소프트™ 개발 3팀</p>
       <p class="tagline2">코딩은 쉬운데 퇴근이 어려운 게임.</p>
       <button id="btn-gotowork" class="btn primary">첫 출근하기</button>
@@ -119,6 +130,7 @@
       <div id="scrum-trust" class="hud-item hidden"><span class="hud-label"><span class="stat-icon trust-icon" aria-hidden="true">✓</span>보고 신뢰도</span><strong id="hud-trust"></strong></div>
       <button id="mines-launch" class="act-btn hidden" type="button">▦ 지뢰찾기</button>
       <button id="office-sidebar-toggle" class="act-btn hidden" type="button" popovertarget="office-sidebar">일정·관계</button>
+      <button id="office-guide-open" class="act-btn" type="button" aria-haspopup="dialog" aria-controls="office-guide">업무 안내</button>
       <button id="office-title" class="act-btn" type="button">타이틀</button>
     </header>
 
@@ -183,6 +195,7 @@
       </section>
 
       <main id="work-panel">
+        <div id="office-lesson" class="hidden"></div>
         <div class="office-briefing">
           <section id="shift-panel" aria-labelledby="shift-title">
             <p id="shift-clock" class="phase-clock"></p>
@@ -218,6 +231,7 @@
             <div class="actions">
               <button id="challenge-submit" class="btn primary" type="button">업무 제출</button>
               <button id="challenge-help-open" class="btn" type="button">힌트</button>
+              <button id="challenge-debug-pass" class="btn debug-pass hidden" type="button">디버그 성공</button>
               <button id="challenge-next" class="btn hidden" type="button"></button>
             </div>
             <div class="challenge-messages">
@@ -228,23 +242,25 @@
         </section>
         <section id="coding-panel" class="hidden" aria-labelledby="mission-title">
           <div id="mission-panel">
-            <div class="mission-heading">
-              <h2 id="mission-title" tabindex="-1"></h2>
-              <button id="mission-help-open" class="act-btn" type="button">문법과 예시</button>
-            </div>
+            <h2 id="mission-title" tabindex="-1"></h2>
             <p id="mission-req" class="req"></p>
             <p class="expect">기대 결과 <code id="mission-expected"></code></p>
           </div>
           <div class="coding-terminal">
             <div class="editor-head">
-              <label for="editor">main.py</label>
+              <label id="editor-file" for="editor"></label>
               <span id="paste-warning" class="warn" role="status"></span>
               <button id="internet-toggle" class="act-btn" type="button" aria-expanded="false" aria-controls="desk-internet">인터넷 검색</button>
+              <button id="coworker-help-open" class="act-btn hidden" type="button" popovertarget="coworker-help">이 대리 도움</button>
             </div>
-            <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+            <div class="editor-shell">
+              <pre class="editor-highlight" aria-hidden="true"><code id="editor-highlight"></code></pre>
+              <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"></textarea>
+            </div>
             <div class="actions">
               <button id="btn-run" class="btn">실행</button>
               <button id="btn-submit" class="btn primary" aria-describedby="submit-status">업무 제출</button>
+              <button id="code-debug-pass" class="btn debug-pass hidden" type="button">디버그 성공</button>
             </div>
             <div id="submit-help" class="submit-help hidden">
               <p id="submit-status" role="status"></p>
@@ -278,7 +294,10 @@
         <section id="compdori-panel" aria-labelledby="compdori-name">
           <span id="compdori-face" class="comdori-avatar" data-action="idle" aria-hidden="true"></span>
           <div class="compdori-copy">
-            <h2 id="compdori-name">컴돌이</h2>
+            <div class="compdori-heading">
+              <h2 id="compdori-name">컴돌이</h2>
+              <button id="lesson-next" class="btn primary hidden" type="button">다음 · 코드 입력 <span aria-hidden="true">↓</span></button>
+            </div>
             <p id="compdori-text" aria-live="polite" aria-atomic="true"></p>
           </div>
         </section>
@@ -292,29 +311,19 @@
         </div>
       </aside>
     </div>
-    <dialog id="mission-help" class="work-note" aria-labelledby="mission-help-title">
-      <h2 id="mission-help-title">문법과 예시</h2>
-      <p id="mission-brief"></p>
-      <p id="mission-bank-meta" class="hidden"></p>
-      <p id="mission-grammar" class="grammar"></p>
-      <pre id="mission-example" class="example"></pre>
-      <pre id="mission-example-out" class="example out"></pre>
-      <section id="mission-public-tests" class="hidden" aria-labelledby="mission-public-title">
-        <h3 id="mission-public-title">공개 테스트</h3>
-        <ul id="mission-public-cases"></ul>
-      </section>
-      <p id="hint-box" class="hint"></p>
-      <div id="mission-support" class="hidden">
-        <button id="mission-review-code" class="btn hidden" type="button">이 대리에게 검토받기</button>
-        <pre id="mission-solution" class="example hidden" aria-label="이 대리의 풀이 예시"></pre>
-        <details id="mission-delegation-options">
-          <summary>업무를 이 대리에게 넘기기</summary>
-          <p id="mission-delegation-cost"></p>
-          <button id="mission-delegate" class="btn" type="button">이 대리에게 넘기기</button>
-        </details>
-      </div>
-      <form method="dialog"><button class="btn">편집기로 돌아가기</button></form>
-    </dialog>
+    <section id="coworker-help" class="work-note" popover aria-labelledby="coworker-help-title">
+      <header>
+        <h2 id="coworker-help-title">이 대리 도움</h2>
+        <button class="btn" type="button" popovertarget="coworker-help" popovertargetaction="hide">닫기</button>
+      </header>
+      <button id="mission-review-code" class="btn hidden" type="button">이 대리에게 검토받기</button>
+      <pre id="mission-solution" class="example hidden" aria-label="이 대리의 풀이 예시"></pre>
+      <details id="mission-delegation-options">
+        <summary>업무 넘기기</summary>
+        <p id="mission-delegation-cost"></p>
+        <button id="mission-delegate" class="btn" type="button">이 대리에게 넘기기</button>
+      </details>
+    </section>
     <dialog id="challenge-help" class="work-note" aria-labelledby="challenge-help-title">
       <h2 id="challenge-help-title">이 대리의 힌트</h2>
       <p id="challenge-hint"></p>
@@ -322,11 +331,8 @@
     </dialog>
     <dialog id="office-guide" aria-labelledby="office-guide-title">
       <div class="office-guide-head">
-        <span id="guide-comdori" class="comdori-avatar" aria-hidden="true"></span>
-        <div>
-          <h2 id="office-guide-title">컴돌이</h2>
-          <p id="office-guide-line"></p>
-        </div>
+        <span class="comdori-avatar" aria-hidden="true"></span>
+        <h2 id="office-guide-title">업무 안내</h2>
       </div>
       <dl>
         <dt><span class="stat-icon health-icon" aria-hidden="true">♥</span>체력</dt>
@@ -342,7 +348,7 @@
         <dt><span class="stat-icon deadline-icon" aria-hidden="true">⚑</span>마감</dt>
         <dd id="guide-deadline-copy"></dd>
       </dl>
-      <form method="dialog"><button class="btn primary" autofocus>첫 업무로 가기</button></form>
+      <form method="dialog"><button class="btn primary" autofocus>닫기</button></form>
     </dialog>
     <dialog id="mines-window" aria-labelledby="mines-title">
       <header class="mines-titlebar">
@@ -414,6 +420,6 @@
       <button id="records-back" class="btn">돌아가기</button>
     </div>
   </section>
-  <script type="module" src="src/main.js?v=33"></script>
+  <script type="module" src="src/main.js?v=39"></script>
 </body>
 </html>

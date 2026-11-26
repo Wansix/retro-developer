@@ -1,19 +1,54 @@
 import { queueCompanionEvent, takeCompanionLine } from "./comdori-commentary.js";
-import { COMDORI_STANDBY } from "./comdori-lines.js";
+import { COMDORI_STANDBY, TUTORIAL_LINES } from "./comdori-lines.js";
 import { dialogueLine } from "./dialogue.js";
 
 const newDelay = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+const LESSON_TARGETS = {
+  time: "#hud-time-item",
+  input: ".editor-shell",
+  submit: "#btn-submit",
+  score: ".hud-item:has(> #hud-progress), .hud-item:has(> #hud-score)",
+  practice: ".editor-shell",
+  health: ".hud-item:has(> #hud-hp)",
+  stress: "#hud-stress-item",
+  trust: "#scrum-trust",
+  scope: ".hud-item:has(> #hud-scope)",
+  deadline: ".hud-item:has(> #hud-dday), #office-guide-open",
+};
 
-export function mountOfficeCompanion({ getState, getShift, paused, onChange }) {
+export function mountOfficeCompanion({ getState, getShift, paused, onChange, onLessonNext }) {
   const panel = document.getElementById("compdori-panel");
+  const corner = panel.parentElement;
+  const lesson = document.getElementById("office-lesson");
   const portrait = document.getElementById("compdori-face");
   const text = document.getElementById("compdori-text");
+  const next = document.getElementById("lesson-next");
+  next.onclick = onLessonNext;
   let mountedState;
   let timer;
   let typing;
   let idleAt;
   let gestureAt;
   let gestureEndsAt = 0;
+  let highlighted = [];
+
+  function setEvent(event = "") {
+    panel.dataset.event = event;
+    next.classList.toggle("hidden", event !== "lesson:time");
+  }
+
+  function highlight(topic) {
+    for (const target of highlighted) target.classList.remove("lesson-target");
+    const selector = LESSON_TARGETS[topic];
+    highlighted = selector ? document.querySelectorAll(selector) : [];
+    for (const target of highlighted) target.classList.add("lesson-target");
+  }
+
+  function place(inLesson) {
+    if (inLesson && panel.parentElement !== lesson) lesson.append(panel);
+    if (!inLesson && panel.parentElement !== corner) corner.prepend(panel);
+    lesson.classList.toggle("hidden", !inLesson);
+  }
 
   function stop() {
     clearInterval(timer);
@@ -22,6 +57,7 @@ export function mountOfficeCompanion({ getState, getShift, paused, onChange }) {
     typing = null;
     gestureEndsAt = 0;
     portrait.dataset.action = "idle";
+    highlight();
   }
 
   function sync(visible) {
@@ -31,7 +67,10 @@ export function mountOfficeCompanion({ getState, getShift, paused, onChange }) {
     if (!visible) return;
     mountedState = state;
     text.textContent = state.last?.text ?? COMDORI_STANDBY;
-    panel.dataset.event = state.last?.event ?? "";
+    setEvent(state.last?.event);
+    const inLesson = panel.dataset.event.startsWith("lesson:");
+    place(inLesson);
+    if (inLesson) highlight(panel.dataset.event.slice("lesson:".length));
     idleAt = Date.now() + newDelay(42000, 62000);
     gestureAt = Date.now() + newDelay(18000, 34000);
     timer = setInterval(tick, 600);
@@ -42,7 +81,7 @@ export function mountOfficeCompanion({ getState, getShift, paused, onChange }) {
     typing = controller;
     gestureEndsAt = 0;
     portrait.dataset.action = "talking";
-    panel.dataset.event = line.event;
+    setEvent(line.event);
     text.replaceChildren();
     text.parentElement.scrollTop = 0;
     dialogueLine(text, line.text, { letterMs: 31, maxMs: 1800, signal: controller.signal }).then(() => {
@@ -54,7 +93,7 @@ export function mountOfficeCompanion({ getState, getShift, paused, onChange }) {
   }
 
   function tick() {
-    if (!timer || document.hidden || paused() || typing) return;
+    if (!timer || document.hidden || paused() || typing || panel.parentElement === lesson) return;
     const now = Date.now();
     const state = getState();
     if (now >= idleAt) {
@@ -86,5 +125,30 @@ export function mountOfficeCompanion({ getState, getShift, paused, onChange }) {
     return true;
   }
 
-  return { emit, sync, tick };
+  function teach(topic) {
+    if (!timer) return;
+    if (!topic) {
+      if (panel.parentElement !== lesson) return;
+      typing?.abort();
+      typing = null;
+      portrait.dataset.action = "idle";
+      setEvent();
+      text.textContent = COMDORI_STANDBY;
+      highlight();
+      place(false);
+      return;
+    }
+    const state = getState();
+    const id = "lesson:" + topic;
+    if (state.seen.includes(id)) return;
+    place(true);
+    highlight(topic);
+    state.seen.push(id);
+    state.pending = state.pending.filter(({ event }) => !["coding", "idle", "success"].includes(event));
+    state.last = { id, event: id, text: TUTORIAL_LINES[topic], at: Date.now() };
+    typing?.abort();
+    say(state.last);
+  }
+
+  return { emit, sync, teach, tick };
 }

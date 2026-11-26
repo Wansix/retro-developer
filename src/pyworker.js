@@ -24,7 +24,7 @@ async function init() {
         const tests = await gradeBank(py, code, check, verify);
         send({ type: "result", jobId, ok: true, stdout, ...tests });
       } else {
-        const passed = check ? await grade(py, namespace, code, check, stdout) : undefined;
+        const passed = check ? await grade(py, namespace, code, check, stdout, verify) : undefined;
         send({ type: "result", jobId, ok: true, stdout, passed });
       }
     } catch (error) {
@@ -95,7 +95,7 @@ async function gradeBank(py, code, check, verify) {
 
 const normalize = (text) => text.replace(/\r\n/g, "\n").trim();
 
-async function grade(py, namespace, code, check, stdout) {
+async function grade(py, namespace, code, check, stdout, verify) {
   const out = normalize(stdout);
   if (check.type === "output") return out === check.expected;
   if (check.type === "number") {
@@ -103,7 +103,8 @@ async function grade(py, namespace, code, check, stdout) {
     return !!line && Number(line) === check.expected;
   }
   if (check.type === "function") {
-    for (const [index, args] of check.args.entries()) {
+    const cases = verify ? check.args : check.args.slice(0, 1);
+    for (const [index, args] of cases.entries()) {
       const json = JSON.stringify(JSON.stringify(args));
       const call = `${check.name}(*__import__("json").loads(${json}))`;
       if (!matches(py, namespace, call, check.expected[index])) return false;
@@ -111,6 +112,7 @@ async function grade(py, namespace, code, check, stdout) {
     return true;
   }
   if (!matches(py, namespace, check.name, check.expected)) return false;
+  if (!verify) return true;
   for (const test of check.cases ?? []) {
     const alternate = replaceInput(py, code, test.variable, test.input);
     if (!alternate) return false;

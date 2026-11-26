@@ -8,17 +8,28 @@ const toolchain = await createToolchain({
 });
 postMessage({ type: "ready" });
 
-self.onmessage = async ({ data: { code, jobId, check, verify } }) => {
+function compileSource(source) {
+  return toolchain.lock(() => toolchain.captureCompilerOutput(() =>
+    toolchain.runtime.compileArtifact(source, {
+      language: "CPP", fileName: "main.cpp", maxWasmMemoryBytes: 64 * 1024 * 1024,
+      compileArgs: [...CLANG_DRIVER_DEFAULT_ARGS, "-std=c++17"],
+    })));
+}
+
+self.onmessage = async ({ data: { type, code, jobId, check, verify } }) => {
+  if (type === "warmup") {
+    // The stock example loads the C++ standard library and linker without using player code.
+    try { await compileSource('#include <iostream>\nint main() { std::cout << "ready"; }'); }
+    catch { /* A player submission can still try the normal compile path. */ }
+    postMessage({ type: "warmed" });
+    return;
+  }
   let stdout = "";
   let stderr = "";
   try {
     const bank = check?.type === "bank-function";
     const source = bank ? cppJudgeSource(code, check, verify) : code;
-    const compiled = await toolchain.lock(() => toolchain.captureCompilerOutput(() =>
-      toolchain.runtime.compileArtifact(source, {
-        language: "CPP", fileName: "main.cpp", maxWasmMemoryBytes: 64 * 1024 * 1024,
-        compileArgs: [...CLANG_DRIVER_DEFAULT_ARGS, "-std=c++17"],
-      })));
+    const compiled = await compileSource(source);
     if (compiled.error) throw new Error(compilerDiagnostics(compiled.raw).join("\n") || compiled.error.message);
     const module = await WebAssembly.compile(compiled.result.bytes);
     const run = async (args, visible) => {

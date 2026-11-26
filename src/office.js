@@ -1,6 +1,6 @@
 import { ARCHITECTURE, AUTOMATION, CODE_REVIEW, DEPARTMENTS, ENDINGS, EXTRA_TICKETS, LUNCH, OFFICE_EVENTS, TICKETS } from "./office-content.js";
 import { MISSIONS } from "./missions.js";
-import { CHAINED_WORK_RULESET, DIRECT_ASSIGNMENT_RULESET, LANGUAGE_ASSIGNMENT_RULESET, PROBLEM_BANK_RULESET, PROJECT_WORKDAYS, RULESET, SCRUM_RULESET, SHORT_PROJECT_RULESET, TOTAL_DAYS, WORK_CONTENT_RULESET, calendarDayForWorkday, formatMinutes, workdayForCalendarDay } from "./records-schema.js";
+import { CHAINED_WORK_RULESET, DIRECT_ASSIGNMENT_RULESET, FUNDAMENTALS_RULESET, LANGUAGE_ASSIGNMENT_RULESET, PROBLEM_BANK_RULESET, PROJECT_WORKDAYS, RULESET, SCRUM_RULESET, SHORT_PROJECT_RULESET, TOTAL_DAYS, WORK_CONTENT_RULESET, calendarDayForWorkday, formatMinutes, workdayForCalendarDay } from "./records-schema.js";
 import { SCRUM_REPORTS, beginScrumDay, finishScrumDay, finishScrumRun, handleScrum, initScrum, markMorningDelivery } from "./scrum.js";
 import { makeWork, gradeWork, problemBankWorkOrder, shortWorkOrder, workOrder, WORK_TYPES } from "./work-missions.js";
 import { applyLeisure, award, canOpenLeisure, initLeisure } from "./mines.js";
@@ -58,6 +58,7 @@ export const RETRY_MINUTES = 5;
 export const CODE_REVIEW_MINUTES = 15;
 export const CODE_DELEGATION = { minutes: 30, score: 12, trust: 8, relation: 1 };
 export const CLEANUP_MINUTES = 90;
+export const DEBUG_PASS_MOVE = "debug-pass";
 
 function draw(s) {
   // A serializable RNG keeps reloads and server-side replay on the same sequence.
@@ -77,7 +78,7 @@ export function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0], id 
   run.deadline = projectLimit(run);
   if (ruleset >= SCRUM_RULESET) initScrum(run);
   if (hasWorkContent(run)) {
-    run.workOrder = hasChainedWork(run) ? projectWorkDeck(seed) : hasProblemBank(run) ? problemBankWorkOrder(seed) :
+    run.workOrder = hasChainedWork(run) ? projectWorkDeck(seed, ruleset >= FUNDAMENTALS_RULESET) : hasProblemBank(run) ? problemBankWorkOrder(seed) :
       hasShortProject(run) ? shortWorkOrder() : workOrder(seed);
     run.stress = 18;
     run.stats.workMinutes = 0;
@@ -189,6 +190,10 @@ export function submitSolution(s) {
   return completeWork(s, mission, "solve");
 }
 
+export function passWorkForDebug(s) {
+  return canSubmit(s) && completeWork(s, currentMission(s), DEBUG_PASS_MOVE);
+}
+
 export function canReviewCode(s) {
   const mission = currentMission(s);
   return hasProblemBank(s) && mayWork(s) && mission.fromBank &&
@@ -244,9 +249,11 @@ function completeWork(s, mission, move) {
   advanceWork(s);
   const reward = mission.reward ?? { score: 14, hp: -3, stress: -4 };
   change(s, reward);
-  s.effects = [mission.explanation ?? (mission.fromBank ? "공개·숨겨진 테스트를 모두 통과했다." : "기능 검수를 통과했다.")];
+  s.effects = [move === DEBUG_PASS_MOVE ? "디버그로 검수 성공을 처리했다." :
+    mission.explanation ?? (mission.fromBank ? "공개·숨겨진 테스트를 모두 통과했다." : "기능 검수를 통과했다.")];
   if (hasChainedWork(s)) s.effects[0] += ` 업무 +1건 · 평가 +${reward.score} · 시간 −${formatMinutes(minutes)}`;
-  if (!isTutorial(s) && s.phase === "morning" && s.remaining >= (hasChainedWork(s) ? 75 : 35) &&
+  if (!isTutorial(s) && s.phase === "morning" && (s.ruleset < FUNDAMENTALS_RULESET || s.shift > 3) &&
+      s.remaining >= (hasChainedWork(s) ? 75 : 35) &&
       (!hasChainedWork(s) || s.workDoneToday === 1)) {
     change(s, { scope: 1 });
     s.stats.calledSimple++;
@@ -442,7 +449,7 @@ export function options(s) {
     case "arrive":
       if (isTutorial(s) && hasLanguageAssignment(s) && !s.language) {
         return [...Object.entries(LANGUAGES).map(([id, { name }]) => choice("stack-" + id, name + " 할 줄 알아요")),
-          choice("stack-none", "아직 할 줄 아는 언어가 없어요")];
+          choice("stack-none", "한국어요.")];
       }
       if (isTutorial(s)) return [choice("arrive", "첫 업무 시작")];
       if (s.shift === 9) return [
@@ -477,7 +484,7 @@ export function options(s) {
         return [
           ...(offered && s.remaining >= codingCost(s, offered)
             ? [choice("nextWork", "다음 업무 받기", `${offered.notice ?? offered.title} · 예상 ${offered.estimate}`)] : []),
-          ...(s.activeWork === OPENING_WORK && !s.hint ? [choice("tutorialHelp", "이 대리에게 도움받기")] : []),
+          ...(s.activeWork === OPENING_WORK && !s.hint ? [choice("tutorialHelp", "이 대리가 골라 준 글 보기")] : []),
           ...(s.scope && s.phase !== "morning" ? [choice("cleanup", "추가 일감 1건 정리",
             `시간 ${formatMinutes(CLEANUP_MINUTES)} · 인사평가 +4`, s.remaining < CLEANUP_MINUTES)] : []),
           ...(!isTutorial(s) && !s.coffee ? [choice("coffee", "커피 한 잔", "시간 25분 · 체력 +8 · 스트레스 −5", s.remaining < 25)] : []),
@@ -489,7 +496,7 @@ export function options(s) {
         const next = s.phase === "overtime" ? "야근을 마치고 퇴근"
           : s.solvedToday ? "퇴근 준비" : "업무를 보류하고 퇴근 준비";
         return [
-          ...(!s.solvedToday && !s.hint ? [choice("tutorialHelp", "이 대리에게 도움받기")] : []),
+          ...(!s.solvedToday && !s.hint ? [choice("tutorialHelp", "이 대리가 골라 준 글 보기")] : []),
           choice("next", next),
         ];
       }
@@ -620,7 +627,7 @@ export function act(s, id) {
         else advanceFromCoding(s);
       } else if (id === "tutorialHelp") {
         s.hint = true;
-        s.effects = ["이 대리가 첫 업무의 문법과 예시를 열어 줬다."];
+        s.effects = ["이 대리가 첫 업무에 참고할 글을 열어 줬다."];
       } else if (id === "cleanup") {
         chargeCoding(s, CLEANUP_MINUTES);
         change(s, { scope: -1, score: 4, hp: -2 });

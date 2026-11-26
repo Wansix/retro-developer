@@ -6,10 +6,21 @@ const BOSS_LINES = {
   pointer: "신입, 어디 가나? 작업 창은 열어 둬.",
   idle: "신입, 자나? 아니면 또 어디서부터 설명할지 생각 중이야?",
   weekend: "주말에 자발적으로 출근했네. 여기 달력에는 평일이긴 한데.",
+  devtools: "신입, 뭘 열어보는 거야? 거기에도 퇴근 버튼은 없어.",
+  editorMenu: "신입, 우클릭해 봐도 메뉴에 퇴근은 없어.",
 };
 
+function isDevToolsShortcut(event) {
+  if (event.defaultPrevented || event.repeat || event.isComposing) return false;
+  if (event.key === "F12") return !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+  const key = (event.code || event.key).replace(/^Key/, "").toLowerCase();
+  if (!["i", "j", "c"].includes(key)) return false;
+  if (event.metaKey && !event.ctrlKey) return event.altKey ? !event.shiftKey : key === "c" && event.shiftKey;
+  return event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey;
+}
+
 // Signals are processed locally. The run only stores which lines have already played.
-export function mountOfficePresence({ active, available, read, save, boss, companion }) {
+export function mountOfficePresence({ editor, active, available, read, save, boss, companion }) {
   const mobile = matchMedia("(hover: none) and (pointer: coarse)");
   let lastInput = Date.now();
   let lastLine = 0;
@@ -44,6 +55,7 @@ export function mountOfficePresence({ active, available, read, save, boss, compa
     const absence = away;
     away = null;
     input();
+    if (returned?.kind === "devtools" && Date.now() <= returned.expires) return;
     if (Date.now() - absence.at >= 5000) {
       const kind = absence.tab ? "tab" : "window";
       if (!say(kind)) returned = { kind, expires: Date.now() + 10000 };
@@ -56,7 +68,15 @@ export function mountOfficePresence({ active, available, read, save, boss, compa
   document.addEventListener("pointerdown", input, { passive: true });
   document.addEventListener("pointermove", input, { passive: true });
   document.addEventListener("wheel", input, { passive: true });
-  document.addEventListener("keydown", input);
+  document.addEventListener("keydown", event => {
+    input();
+    if (!active() || !isDevToolsShortcut(event) || read().includes("devtools")) return;
+    if (!say("devtools")) returned = { kind: "devtools", expires: Date.now() + 75000 };
+  });
+  editor.addEventListener("contextmenu", event => {
+    input();
+    if (event.button === 2 || (event.button === 0 && event.ctrlKey)) say("editorMenu");
+  });
   document.documentElement.addEventListener("pointerenter", input, { passive: true });
   document.documentElement.addEventListener("pointerleave", event => {
     if (event.pointerType !== "mouse" || !active()) return;

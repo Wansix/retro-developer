@@ -2,7 +2,7 @@ import { INTRANET_SITES } from "./intranet-documents.js";
 import { LANGUAGES } from "./office-languages.js";
 import {
   currentInternetPage, documentById, documentMatchesTopics, goInternetBack,
-  missionTopics, readInternetArticle, recordInternetSearch, searchIntranet, visitInternetPage,
+  missionTopics, readInternetArticle, recommendedIntranetArticles, recordInternetSearch, searchIntranet, visitInternetPage,
 } from "./intranet-search.js";
 
 function node(tag, text, className) {
@@ -36,6 +36,11 @@ export function mountIntranet({ getState, getMission, onChange, onComment }) {
   function sync(visible = codingVisible) {
     codingVisible = visible;
     const state = getState();
+    const mission = codingVisible ? getMission() : null;
+    if (mission && mission.id !== state.workPage) {
+      state.workPage = mission.id;
+      visitInternetPage(state, { view: "home" });
+    }
     const open = codingVisible && !!state.open;
     browser.classList.toggle("hidden", !open);
     coding.classList.toggle("internet-open", open);
@@ -44,7 +49,6 @@ export function mountIntranet({ getState, getMission, onChange, onComment }) {
     for (const panel of codingPanels) panel.inert = open && !docked.matches;
     if (!open) return;
     const page = currentInternetPage(state);
-    const mission = getMission();
     if (paintedPage === page && paintedState === state && paintedMission === mission?.id) return;
     paintedPage = page;
     paintedState = state;
@@ -74,19 +78,54 @@ export function mountIntranet({ getState, getMission, onChange, onComment }) {
   }
 
   function home(mission) {
-    const page = node("div", null, "internet-portal");
-    page.append(node("h3", "미래검색"), node("p", LANGUAGES[mission?.language ?? "python"].name + " 개발 자료와 사내 즐겨찾기"));
+    if (!mission) return node("p", "검색어를 입력해 사내 개발 자료를 찾아보세요.", "internet-portal");
+    const page = node("article", null, "internet-article internet-work-note");
+    page.dataset.site = "blog";
+    const header = node("header", null, "internet-site");
+    header.append(node("strong", "이 대리의 개발노트"));
+    const body = node("div", null, "internet-entry");
+    const language = LANGUAGES[mission.language ?? "python"].name;
+    body.append(node("h3", mission.title), node("p", [language, mission.difficultyLabel].filter(Boolean).join(" · "), "internet-meta"));
+    if (mission.brief) body.append(node("p", mission.brief));
+    if (mission.grammar) body.append(node("p", mission.grammar));
+    if (!mission.fromBank && mission.example) {
+      body.append(node("h4", "따라 해 볼 예제"), node("pre", mission.example));
+      if (mission.exampleOut) body.append(node("p", "예제 결과 " + mission.exampleOut, "internet-meta"));
+    }
+    const related = recommendedIntranetArticles(mission);
+    if (related.length) {
+      body.append(node("h4", "관련 글"));
+      const links = node("ul", null, "internet-reference-links");
+      for (const doc of related) {
+        const item = node("li");
+        item.append(linkButton(doc.title, () => openArticle(doc.id)),
+          node("p", INTRANET_SITES[doc.site].kind + " · " + doc.author, "internet-meta"));
+        links.append(item);
+      }
+      body.append(links);
+    }
+    if (mission.publicExamples?.length || (mission.id !== "hello-world" && mission.hint)) {
+      const detail = node("details", null, "internet-work-checks");
+      detail.append(node("summary", "힌트와 공개 테스트"));
+      if (mission.id !== "hello-world" && mission.hint) detail.append(node("p", mission.hint));
+      if (mission.publicExamples?.length) {
+        detail.append(node("h4", "공개 테스트"));
+        for (const example of mission.publicExamples) detail.append(node("pre", example));
+      }
+      body.append(detail);
+    }
     const topics = missionTopics(mission).slice(0, 4);
     if (topics.length) {
-      page.append(node("h4", "이 업무의 검색어"));
-      const links = node("ul");
+      body.append(node("h4", "추천 검색어"));
+      const links = node("ul", null, "internet-topic-links");
       for (const topic of topics) {
         const li = node("li");
         li.append(linkButton(topic, () => search(topic)));
         links.append(li);
       }
-      page.append(links);
+      body.append(links);
     }
+    page.append(header, body);
     return page;
   }
 
@@ -185,6 +224,12 @@ export function mountIntranet({ getState, getMission, onChange, onComment }) {
     else toggle.focus({ preventScroll: true });
   }
 
+  function openHome() {
+    visitInternetPage(getState(), { view: "home" });
+    setOpen(true);
+    view.focus({ preventScroll: true });
+  }
+
   toggle.onclick = () => setOpen(!getState().open);
   $("internet-close").onclick = () => setOpen(false);
   $("internet-back").onclick = () => {
@@ -202,5 +247,5 @@ export function mountIntranet({ getState, getMission, onChange, onComment }) {
     setOpen(false);
   };
   docked.addEventListener("change", () => sync());
-  return { sync };
+  return { sync, openHome };
 }
