@@ -1,3 +1,5 @@
+import { dialogueText } from "./dialogue-overrides.js";
+import { officeCopy } from "./office-copy.js";
 import { hasSurvival } from "./survival.js";
 import { ARCHITECTURE, AUTOMATION, CODE_REVIEW, DEPARTMENTS, LUNCH } from "./office-content.js";
 
@@ -10,24 +12,24 @@ export const CAST_NAMES = {
   ...Object.fromEntries(Object.entries(DEPARTMENTS).map(([id, department]) => [id, department.name])),
 };
 
-const ARRIVAL_SCENES = {
-  [ARCHITECTURE.title]: [
+export const ARRIVAL_SCENES = {
+  architecture: [
     ["jung", "확장성이 부족해. 전체적으로 다시 설계하지."],
     ["boss", "네, 알겠습니다. …신입, 내일까지 수정해."],
     ["me", "일정도 변경되는 건가요?"],
     ["boss", "아니."],
   ],
-  [CODE_REVIEW.title]: [
+  review: [
     ["boss", "내가 이렇게 구현하라고 했잖아."],
     ["jung", "누가 이렇게 구현하라고 했어?"],
     ["boss", "…신입이 작성한 코드입니다."],
   ],
-  [AUTOMATION.title]: [
+  automation: [
     ["lee", "검수표 복사하는 데만 오전이 다 가요. 이거 한꺼번에 옮길 방법 없을까요?"],
   ],
 };
 
-const SCRUM_SCENES = {
+export const SCRUM_SCENES = {
   short: [
     ["boss", "오늘은 짧게 합시다."],
     ["park", "제 건 사실상 다 끝났습니다. 정리한 표가 여기 세 장인데요."],
@@ -42,13 +44,13 @@ const SCRUM_SCENES = {
   ],
 };
 
-const LUNCH_REPLIES = {
+export const LUNCH_REPLIES = {
   park: ["park", "회의 끝나고 물어봐. 사람들 앞에서 물으면 갑자기 다들 할 말이 생겨."],
   help: ["lee", "같이 봐줘서 고마워. 퇴근 직전에 알린 건데, 또 제가 한다고 했네요."],
   kim: ["boss", "고객 전화 대신 받아줘서 고마워. 덕분에 오늘은 밥이 식기 전에 먹네."],
 };
 
-const FRIDAY_SCENE = [
+export const FRIDAY_SCENE = [
   ["planning", "기능 하나만 더 넣겠습니다."],
   ["design", "최종 시안은 조금 바뀌었어요."],
   ["sales", "납품은 하루 앞당기기로 했습니다."],
@@ -56,7 +58,7 @@ const FRIDAY_SCENE = [
   ["boss", "신입, 가능하지?"],
 ];
 
-const DEPARTMENT_REPLIES = {
+export const DEPARTMENT_REPLIES = {
   accept: {
     planning: "그럼 추가 기능도 이번 버전에 넣는 걸로 적겠습니다.",
     design: "좋아요. 새 시안은 지금 보내드릴게요.",
@@ -83,14 +85,14 @@ const DEPARTMENT_REPLIES = {
   },
 };
 
-const FRIDAY_REPLIES = {
+export const FRIDAY_REPLIES = {
   yes: ["sales", "좋습니다. 고객님한테 오늘 바로 가능하다고 말씀드리죠."],
   no: ["qa", "아직 검수도 못 끝냈어요. 지금 일정으로는 저도 승인 못 합니다."],
   trim: ["planning", "그럼 출시 필수 항목부터 잠그죠. 나머지는 다음 버전으로 뺄게요."],
   joke: ["lee", "…아, 웃으면 안 되는 거였죠?"],
 };
 
-const SURVIVAL_SCENES = {
+export const SURVIVAL_SCENES = {
   3: [["park", "신입, 예상 시간 30분짜리 봤어? 내가 맡았으니까 찾지 마."]],
   6: [["boss", "오늘 토요일이니까 오전만 하고 가자. 중국집 전화번호는 누가 갖고 있어?"]],
   8: [["park", "이 대리 병가래. 그 사람이 쓴 검수표는 출근했더라."]],
@@ -100,23 +102,37 @@ const SURVIVAL_SCENES = {
   12: [["boss", "오늘 납품이야, 신입. 검수 통과한 파일에만 진짜 최종이라고 적어."]],
 };
 
+const ARRIVAL_EVENTS = { [ARCHITECTURE.title]: "architecture", [CODE_REVIEW.title]: "review", [AUTOMATION.title]: "automation" };
+
+export function editedScene(id, lines) {
+  return lines?.map(([who, text, expression], index) => [
+    who, dialogueText(`${id}.${index}`, text), expression,
+  ]);
+}
+
 export function officeScene(state, friday) {
   if (state.phase === "sunday") return null;
   const previous = state.moves.at(-1);
-  if (previous === "code-delegate") return [["lee", "이 건은 제가 넘겨받아서 끝냈어요. 다음에 막히는 데가 있으면 미리 얘기해 줘요."]];
+  if (previous === "code-delegate") return [["lee", officeCopy("delegated")]];
   switch (state.phase) {
-    case "arrive": return hasSurvival(state) && SURVIVAL_SCENES[state.shift] || ARRIVAL_SCENES[state.event.title];
-    case "scrum": return SCRUM_SCENES[state.scrum.event?.id];
-    case "lunch": return [LUNCH[(state.shift - 1) % LUNCH.length]];
-    case "negotiate": return [LUNCH_REPLIES[previous], [state.department, state.request[1]]].filter(Boolean);
-    case "morning": return previous === "tutorialHelp"
-      ? [["lee", "예시를 열어 뒀어요. 괄호 안에 문장을 넣고, 따옴표도 꼭 닫아 주세요."]]
-      : undefined;
+    case "arrive": return (hasSurvival(state) && editedScene("arrival.day." + state.shift, SURVIVAL_SCENES[state.shift])) ||
+      editedScene("arrival.event." + ARRIVAL_EVENTS[state.event.title], ARRIVAL_SCENES[ARRIVAL_EVENTS[state.event.title]]);
+    case "scrum": return editedScene("scrum." + state.scrum.event?.id, SCRUM_SCENES[state.scrum.event?.id]);
+    case "lunch": {
+      const index = (state.shift - 1) % LUNCH.length;
+      return editedScene("lunch." + index, [LUNCH[index]]);
+    }
+    case "negotiate": {
+      const reply = editedScene("lunch.reply." + previous, LUNCH_REPLIES[previous] ? [LUNCH_REPLIES[previous]] : []);
+      const index = DEPARTMENTS[state.department].requests.findIndex(request => request[0] === state.request[0]);
+      return [...reply, ...editedScene(`request.${state.department}.${index}`, [[state.department, state.request[1]]])];
+    }
+    case "morning": return previous === "tutorialHelp" ? [["lee", officeCopy("tutorialExample")]] : undefined;
     case "afternoon": {
       const line = DEPARTMENT_REPLIES[previous]?.[state.department];
-      return line ? [[state.department, line, true]] : undefined;
+      return line ? editedScene(`negotiated.${previous}.${state.department}`, [[state.department, line, true]]) : undefined;
     }
-    case "report": return friday ? FRIDAY_SCENE : undefined;
-    case "leave": return FRIDAY_REPLIES[previous] ? [[...FRIDAY_REPLIES[previous], true]] : undefined;
+    case "report": return friday ? editedScene("friday", FRIDAY_SCENE) : undefined;
+    case "leave": return FRIDAY_REPLIES[previous] ? editedScene("friday.reply." + previous, [[...FRIDAY_REPLIES[previous], true]]) : undefined;
   }
 }

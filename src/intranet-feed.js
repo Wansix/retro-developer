@@ -4,6 +4,16 @@ import { seededShuffle } from "./seeded.js";
 
 export const INTERNET_COST = { open: 5, blog: 3, board: 3, manual: 5, lecture: 10 };
 export const INTERNET_TYPES = { blog: "개인 홈페이지", board: "개발 게시판", manual: "기술 문서", lecture: "동영상 강의" };
+export const LECTURE_LINES = {
+  intro: "Hello my friends! Today we are going to learn about {chapter}!",
+  first: "Look at the board. Start with a small example and check each step.",
+  second: "Compare what the program does with the result you expected.",
+  firstArray: "Look at the first box. We start counting at zero!",
+  secondArray: "The length is three, but the last index is two.",
+  closing: "Very simple, very easy!",
+};
+export const SELF_FIXED_REACTION = "그래서 어떻게 해결했는데?!";
+
 export const INTERNET_ALERTS = [
   [20, "신입, 코딩은 안 하고 인터넷만 보고 있네?"],
   [60, "인터넷 검색하는 데 한 시간씩 걸려?"],
@@ -22,7 +32,7 @@ function detours(topic) {
       question: `${topic}에서 자꾸 결과가 이상합니다. 오늘 안으로 해결해야 하는데요.`,
       paragraphs: ["아, 해결했습니다. 신경 써 주셔서 감사합니다."],
       comments: [["마지막 접속 2006.02.25", "작성자가 추가 답변을 받지 않습니다."]],
-      reaction: "그래서 어떻게 해결했는데?!", useful: false },
+      reaction: SELF_FIXED_REACTION, useful: false },
     { id: "unanswered", type: "board", site: "cafe", title: "3년째 답변이 없는 질문", author: "새벽세시", date: "2003-02-08",
       question: `${topic} 질문입니다. 실행하면 제 컴퓨터에서만 안 됩니다.`,
       paragraphs: ["첨부파일을 올리려 했는데 용량이 넘었습니다. 필요하시면 쪽지 주세요."],
@@ -81,12 +91,10 @@ function lectureFor(language, topic, doc) {
     title: `${LANGUAGES[language].name} · ${topic} 미니 강의`,
     duration: 16,
     frames: [
-      { at: 0, caption: `Hello my friends! Today we are going to learn about ${chapter}!`, board: topic, code: "" },
-      { at: 4, caption: array ? "Look at the first box. We start counting at zero!" :
-        "Look at the board. Start with a small example and check each step.", board: detail, code: example.split("\n").slice(0, 2).join("\n") },
-      { at: 9, caption: array ? "The length is three, but the last index is two." :
-        "Compare what the program does with the result you expected.", board: detail, code: example },
-      { at: 13, caption: "Very simple, very easy!", board: detail, code: example },
+      { at: 0, id: "intro", vars: { chapter }, caption: LECTURE_LINES.intro, board: topic, code: "" },
+      { at: 4, id: array ? "firstArray" : "first", caption: array ? LECTURE_LINES.firstArray : LECTURE_LINES.first, board: detail, code: example.split("\n").slice(0, 2).join("\n") },
+      { at: 9, id: array ? "secondArray" : "second", caption: array ? LECTURE_LINES.secondArray : LECTURE_LINES.second, board: detail, code: example },
+      { at: 13, id: "closing", caption: LECTURE_LINES.closing, board: detail, code: example },
     ],
   };
 }

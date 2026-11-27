@@ -1,3 +1,5 @@
+import { dialogueText } from "./dialogue-overrides.js";
+
 function element(tag, text, className) {
   const node = document.createElement(tag);
   if (text) node.textContent = text;
@@ -82,8 +84,9 @@ export function buildLecture(lesson, clip, { hasPlayed, onPlay, onWatched, onCha
     if (frame !== previousFrame) {
       key.textContent = frame.board;
       code.textContent = frame.code;
-      caption.textContent = frame.caption;
-      if (active) speak(frame.caption);
+      const text = dialogueText("lecture." + frame.id, frame.caption, frame.vars);
+      caption.textContent = text;
+      if (active) speak(text);
       previousFrame = frame;
     }
     drawInstructor(portrait, active && !reduced.matches && Math.floor(position * 7) % 2 === 0);

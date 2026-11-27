@@ -1,3 +1,4 @@
+import { dialogueText } from "./dialogue-overrides.js";
 import { INTRANET_SITES } from "./intranet-documents.js";
 import { internetFeed, internetQuote, INTERNET_TYPES } from "./intranet-feed.js";
 import { LANGUAGES } from "./office-languages.js";
@@ -44,7 +45,7 @@ export function mountIntranet({ getUi, getRun, getMission, spend, onChange, onCo
       notice.textContent = "업무 시간이 부족합니다. 다음 업무 시간이나 야근에 이어서 보세요.";
       return false;
     }
-    notice.textContent = result.warning ? "김 과장 · " + result.warning :
+    notice.textContent = result.warning ? "김 과장 · " + dialogueText("internet.warning." + result.warning[0], result.warning[1]) :
       result.minutes ? `업무 시간 −${result.minutes}분` : "";
     return true;
   }
@@ -164,7 +165,7 @@ export function mountIntranet({ getUi, getRun, getMission, spend, onChange, onCo
         }
         body.append(comments);
       }
-      if (item.reaction) body.append(node("p", "나 · " + item.reaction, "internet-reaction"));
+      if (item.reaction) body.append(node("p", "나 · " + dialogueText("internet.selfFixed", item.reaction), "internet-reaction"));
     }
     page.append(header, body);
     return page;

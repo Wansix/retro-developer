@@ -1,3 +1,4 @@
+import { dialoguePool } from "./dialogue-overrides.js";
 import { COMDORI_LINES } from "./comdori-lines.js";
 
 const MAX_PENDING = 6;
@@ -9,7 +10,7 @@ export function newCompanionState() {
 }
 
 function remainingLines(state, event) {
-  return COMDORI_LINES[event].lines
+  return dialoguePool("companion." + event, COMDORI_LINES[event].lines)
     .map((text, index) => ({ id: event + ":" + index, text, event }))
     .filter(line => !state.seen.includes(line.id));
 }

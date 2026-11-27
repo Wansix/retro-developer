@@ -1,6 +1,8 @@
+import { CLOCK_REPLIES, MINE_REPLIES, officeCopy } from "./office-copy.js";
+import { dialoguePool, dialogueText, editedScript, loadDialogueOverrides } from "./dialogue-overrides.js";
 import { BOSS_LINES, MISSIONS, PASTE_LINES, SCENE_2006, TRAVEL_LINES, WRONG_RUN_LINES } from "./missions.js";
 import { DEPARTMENTS, ENDINGS, EPILOGUE } from "./office-content.js";
-import { CAST_NAMES, officeScene } from "./office-scenes.js";
+import { CAST_NAMES, editedScene, officeScene } from "./office-scenes.js";
 import {
   CLEANUP_MINUTES, CODE_DELEGATION, CODE_REVIEW_MINUTES, DEBUG_PASS_MOVE, PHASES, RELATION_NAMES, act, canDelegateCode, canReviewCode,
   canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, failPracticeRun, hasDirectAssignments,
@@ -57,17 +59,6 @@ const officeGuide = $("office-guide");
 const nextOfficeLine = $("office-dialogue-next");
 const officeReducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 const compactOffice = matchMedia("(max-width: 740px), (max-height: 430px)");
-const CLOCK_REPLIES = [
-  "시계 봤어? 나도 봤어. 일단 이거 하나만 더 보자.",
-  "시계 보고 있으면 시간이 더 안 가. 나도 신입 때 확인해 봤어.",
-  "벌써 퇴근 생각이야? …그래, 나도 방금 했어.",
-];
-const MINE_REPLIES = [
-  [["boss", "신입, 지금 뭐 하는 거야?"], ["me", "지뢰 제거하고 있습니다."], ["boss", "우리 프로젝트에 지뢰가 그렇게 많아?"]],
-  [["boss", "또 지뢰야? 이번엔 진짜 버그 하나 잡아 와."], ["lee", "지금 들어온 추가 일감은 깃발로 표시해 둘게요."]],
-  [["boss", "지뢰찾기는 배포 승인 받고 해. 오늘 결산에는 내가 직접 적을 테니까."]],
-];
-
 // --- 화면 전환 ---
 function show(id) {
   hideClockTime();
@@ -136,7 +127,8 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function typeAgentLogs(lines, termId, linePause) {
   const term = $(termId);
-  for (const line of lines) {
+  for (const [index, fallback] of lines.entries()) {
+    const line = dialogueText("travel." + index, fallback);
     const letters = document.createTextNode("");
     term.append(letters, "\n");
     await typeDialogue(letters, line, {
@@ -199,7 +191,7 @@ function markIntroSeen() {
 function enter2006() {
   show("screen-2006");
   document.getElementById("chat-log-2006").innerHTML = "";
-  runScript(SCENE_2006, "chat-log-2006", "buttons-2006", () => {
+  runScript(editedScript("wake", SCENE_2006), "chat-log-2006", "buttons-2006", () => {
     markIntroSeen();
     setTimeout(() => show("screen-titlecard"), 900);
   });
@@ -239,7 +231,7 @@ const taskTimer = mountWorkTimer({
     if (busy || !useBurst(state)) return;
     renderOffice();
     companion.emit("burst");
-    bossSay("신입, 이렇게 빨리 할 수 있었는데 그동안 뭐 한 거야?");
+    bossSay(officeCopy("burst"));
   },
   onBudgetChange() {
     renderChoices();
@@ -248,7 +240,7 @@ const taskTimer = mountWorkTimer({
   },
   onTimeout() {
     hud();
-    bossSay("신입, 약속 시간 지났어. 검수는 계속해. 일정은 다시 얘기하자.");
+    bossSay(officeCopy("timeout"));
   },
 });
 
@@ -323,10 +315,11 @@ const minesWindow = mountMinesWindow({
     if (closed) {
       renderOffice();
       if (closed === "caught") {
-        playOfficeScene(MINE_REPLIES[Math.min(3, state.stats.minesCaught) - 1]);
+        const index = Math.min(3, state.stats.minesCaught) - 1;
+        playOfficeScene(editedScene("mines." + index, MINE_REPLIES[index]));
         companion.emit("scolded");
       }
-      if (closed === "expired") bossSay("지금 쓸 수 있는 업무 시간이 다 갔어. 다음 일정으로 넘어가.");
+      if (closed === "expired") bossSay(officeCopy("mineExpired"));
       companion.tick();
     } else {
       if (timeChanged) hud();
@@ -423,7 +416,7 @@ function bossSay(line, source = null) {
 }
 
 async function react(kind) {
-  const fallback = BOSS_LINES[kind];
+  const fallback = dialogueText("boss." + kind, BOSS_LINES[kind]);
   if (Math.random() < .5) return bossSay(fallback);
 
   stopOfficeScene();
@@ -656,19 +649,19 @@ function phaseStory() {
 
 function firstDayLesson() {
   if (!isTutorial(state)) return null;
-  if (hasOfficeClock(state) && state.phase === "lunch") return "신입, 점심은 한 시간이야. 오후에 자리로 돌아오면 새 일 하나 줄게.";
-  if (state.phase === "leave") return "신입, 남은 건 내일 봐도 돼. 오늘 더 하고 갈 거야?";
+  if (hasOfficeClock(state) && state.phase === "lunch") return officeCopy("firstLunch");
+  if (state.phase === "leave") return officeCopy("firstLeave");
   if (state.phase === "overtime" && state.moves.at(-1) === "stay") {
-    return "더 한다고? 알았어. 컵라면은 비품 창고에 있어.";
+    return officeCopy("firstOvertime");
   }
   if (state.phase !== "morning") return null;
   if (state.solvedToday && (state.workDoneToday ?? 1) === 1) {
-    if (state.moves.at(-1) === "code-delegate") return "이 대리가 끝냈어. 다음에 비슷한 거 들어오면 같이 봐.";
-    return "첫 검수 통과야. 손 좀 풀렸으면 다음 일도 하나 줄게.";
+    if (state.moves.at(-1) === "code-delegate") return officeCopy("firstDelegated");
+    return officeCopy("firstPassed");
   }
-  if (state.hint && state.moves.at(-1) === "tutorialHelp") return "이 대리가 참고할 글 줬지? 예제 한번 보고 와.";
+  if (state.hint && state.moves.at(-1) === "tutorialHelp") return officeCopy("firstHint");
   if (currentMission(state)?.id === MISSIONS[0].id && !state.solvedToday) {
-    return "신입, Hello, World! 한 줄 찍어 봐. 나도 첫날엔 이거부터 했어.";
+    return officeCopy("firstTask");
   }
   return null;
 }
@@ -906,7 +899,7 @@ function submitChallenge(answer) {
   if (state.ending) return endRun();
   if (result.passed) {
     renderOffice(true);
-    if (!isTutorial(state)) bossSay("검수 통과야. 수고했어, 신입.");
+    if (!isTutorial(state)) bossSay(officeCopy("puzzlePassed"));
   } else {
     $("challenge-feedback").textContent = `검수 실패 · 업무 시간 ${result.minutes}분 사용. 이 대리의 힌트를 참고해 다시 해 보세요.`;
     hud();
@@ -946,39 +939,42 @@ function renderOffice(focus = false, { reaction } = {}) {
   const lesson = firstDayLesson();
   const scene = officeScene(state, isFriday(state.day));
   if (isTutorial(state) && state.phase === "arrive") {
-    if (!state.playerName || !hasLanguageAssignment(state)) bossSay("신입, 이름이 뭐야?");
-    else if (!state.language) bossSay(`${state.playerName} 씨, 무슨 언어 할 줄 알아?`);
+    if (!state.playerName || !hasLanguageAssignment(state)) bossSay(officeCopy("name"));
+    else if (!state.language) bossSay(officeCopy("languageAsk", { name: state.playerName }));
     else bossSay(state.familiarLanguage === "none"
-      ? `한국어는 나도 해, 신입. 우리 팀은 ${LANGUAGES[state.language].name} 써. 오늘부터 배워.`
-      : `그래? 우리 팀은 ${LANGUAGES[state.language].name} 쓰는데. 처음이면 하면서 배우면 돼. 오늘까지야.`);
+      ? officeCopy("languageNone", { language: LANGUAGES[state.language].name })
+      : officeCopy("languageOther", { language: LANGUAGES[state.language].name }));
   } else if (lesson) {
     bossSay(lesson);
   } else if (state.phase === "sunday") {
-    officeSay("me", "오늘만큼은 호출기를 꺼 둬도 되겠지.");
+    officeSay("me", officeCopy("sunday"));
     companion.emit("sunday");
   } else if (isHalfDay(state) && state.phase === "leave") {
-    bossSay(hasSurvival(state) ? (state.deliverySubmitted ? "납품 메일 보냈어. 신입, 이제 가 봐." :
-      "오늘 오전까지만 하랬지. 근데 다들 점심은 먹고 갈 거지?") : "열두 시 됐어, 신입. 남은 건 월요일에 하자.");
+    bossSay(hasSurvival(state) ? (state.deliverySubmitted ? officeCopy("satDelivered") :
+      officeCopy("satLunch")) : officeCopy("satLeaveOld"));
   } else if (hasSurvival(state) && !state.task && !state.solvedToday && isCoding(state.phase) && currentMission(state)) {
-    bossSay("신입, 이거 얼마나 걸려?");
+    bossSay(officeCopy("estimate"));
   } else if (scene) {
     playOfficeScene(scene);
   } else if (state.phase === "arrive") {
     bossSay(state.day === 1
-      ? "정 부장이 기술 방향을 잡고, 나랑 박 대리, 이 대리가 쇼핑몰을 같이 맡는다. 자네는 오늘부터 사원이야."
-      : "출근했구나. 오늘 일정부터 보자.");
+      ? officeCopy("arrivalFirst")
+      : officeCopy("arrival"));
   } else if (isCoding(state.phase) && currentMission(state) && !state.solvedToday) {
-    const missionLine = currentMission(state).boss;
+    const mission = currentMission(state);
+    const missionLine = mission.id.startsWith("code:") ? officeCopy("bankMission", { title: mission.title }) :
+      mission.type && mission.type !== "code" ? officeCopy("miniMission", { title: mission.notice }) :
+        dialogueText("mission." + mission.id, mission.boss);
     bossSay(isTutorial(state) && state.playerName ? `${state.playerName}, ${missionLine.replace(/^신입, /, "")}` : missionLine);
   } else {
     bossSay(({
       scrum: hasDirectAssignments(state) && state.shift === 2
-        ? "오늘부터 스크럼이야. 어제 한 일이랑 오늘 할 일, 짧게 말해 봐."
-        : "신입, 어제 뭐 했고 오늘 뭐 할 거야? 막힌 게 있으면 같이 말해줘.",
-      assign: hasWorkContent(state) ? "신입, 오늘은 이 건 좀 봐줘. 자세한 건 업무 받으면 확인해." : "인원은 그대로고 할 일은 늘었어. 업무표 보고 이야기하자.",
-      report: "문제가 있으면 지금 말해줘. 그래야 나도 위에 보고할 수 있어.",
-      leave: BOSS_LINES.leave,
-    })[state.phase] ?? "오늘 처리할 수 있는 일부터 보자.");
+        ? officeCopy("scrumFirst")
+        : officeCopy("scrum"),
+      assign: hasWorkContent(state) ? officeCopy("assign") : officeCopy("assignOld"),
+      report: officeCopy("report"),
+      leave: dialogueText("boss.leave", BOSS_LINES.leave),
+    })[state.phase] ?? officeCopy("officeFallback"));
   }
 }
 
@@ -1156,7 +1152,10 @@ async function handleCode(submit) {
     renderCoding();
     minesWindow.sync();
     if (!submit && result.passed && isTutorial(state) && mission.id === MISSIONS[0].id) companion.teach("submit");
-    if (wrongRun) bossSay(WRONG_RUN_LINES[wrongRunComments++ % WRONG_RUN_LINES.length]);
+    if (wrongRun) {
+      const lines = dialoguePool("boss.wrongRun", WRONG_RUN_LINES);
+      bossSay(lines[wrongRunComments++ % lines.length]);
+    }
     else {
       if (result.timeout || (!result.ok && !result.unavailable)) react("error");
       if (!result.unavailable && (result.timeout || !result.ok || result.passed === false)) companion.emit("error");
@@ -1168,7 +1167,8 @@ function blockInsertion(event) {
   event.preventDefault();
   const count = recordPaste(state);
   if (!count) return;
-  const line = PASTE_LINES[Math.min(count - 1, PASTE_LINES.length - 1)];
+  const index = Math.min(count - 1, PASTE_LINES.length - 1);
+  const line = dialogueText("paste." + index, PASTE_LINES[index]);
   bossSay(line);
   companion.emit("scolded");
   $("paste-warning").textContent = count === 3 ? `김 과장 · ${line}  [업적 달성]` : `김 과장 · ${line}`;
@@ -1257,7 +1257,7 @@ function endRun() {
   $("chat-log-twist").replaceChildren();
   $("buttons-twist").replaceChildren();
   show("screen-twist");
-  runScript(EPILOGUE, "chat-log-twist", "buttons-twist", () => {
+  runScript(editedScript("epilogue", EPILOGUE), "chat-log-twist", "buttons-twist", () => {
     const end = document.createElement("p");
     end.className = "credits-end";
     end.textContent = "THE END";
@@ -1299,7 +1299,7 @@ $("btn-start").onclick = async () => {
   startAgent.classList.add("hidden");
   show("screen-intro-thought");
   $("intro-thought-time").focus({ preventScroll: true });
-  await dialogueLine(thought, "로그인 오류 문구 하나만 고치면 퇴근이다. 컴돌이한테 맡겨 볼까?", {
+  await dialogueLine(thought, officeCopy("openingThought"), {
     voice: "me", letterMs: 42, maxMs: 1250,
   });
   startAgent.classList.remove("hidden");
@@ -1333,11 +1333,16 @@ officeGuide.onclose = () => {
   resetIdle();
   companion.tick();
 };
+function clockLine() {
+  const lines = dialoguePool("boss.clock", CLOCK_REPLIES);
+  return lines[clockChecks++ % lines.length];
+}
+
 $("office-clock").onclick = () => {
   peekAtClock();
   if (state.phase === "sunday") return;
   const naming = isTutorial(state) && state.phase === "arrive";
-  bossSay(naming ? "벌써 시계부터 봐? 출근은 했으니까, 신입 이름부터 알려 줘." : CLOCK_REPLIES[clockChecks++ % CLOCK_REPLIES.length]);
+  bossSay(naming ? officeCopy("clockFirst") : clockLine());
   resetIdle();
 };
 $("office-title").onclick = title;
@@ -1389,4 +1394,5 @@ $("title-records").onclick = () => openRecords(lastRecord, title);
 $("ending-records").onclick = () => openRecords(lastRecord, () => showResult(lastRecord));
 initRecords(show, (message) => { $("ending-sync").textContent = message; });
 initDialogueSound();
+await loadDialogueOverrides();
 title();

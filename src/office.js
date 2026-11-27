@@ -302,7 +302,7 @@ export function useInternet(s, action, id) {
   settleCosts(s);
   return {
     minutes,
-    warning: INTERNET_ALERTS.find(([threshold]) => before < threshold && before + minutes >= threshold)?.[1],
+    warning: INTERNET_ALERTS.find(([threshold]) => before < threshold && before + minutes >= threshold),
   };
 }
 

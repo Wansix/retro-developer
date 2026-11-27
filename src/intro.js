@@ -1,3 +1,5 @@
+import { editedScript } from "./dialogue-overrides.js";
+import { officeCopy } from "./office-copy.js";
 import { dialogueLine } from "./dialogue.js";
 import { PROLOGUE_2026 } from "./missions.js";
 
@@ -133,8 +135,8 @@ export function playIntro(onDone) {
     showPreview("baseline");
     status.textContent = "연결됨";
     status.dataset.activity = "";
-    await replyToPlayer("어떤 작업을 할까요?");
-    for (const step of PROLOGUE_2026) {
+    await replyToPlayer(officeCopy("openingAgent"));
+    for (const step of editedScript("intro", PROLOGUE_2026)) {
       if (step.who === "me" || step.who === "check") {
         await waiting(step);
         continue;

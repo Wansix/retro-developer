@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>옛날 개발자 · 대사 편집실</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <header class="workspace-header">
+    <h1>대사 편집실</h1>
+    <a href="/" target="_blank" rel="noopener">게임 미리보기 ↗</a>
+  </header>
+  <main>
+    <section class="browser" aria-labelledby="list-title">
+      <h2 id="list-title">상황별 대사</h2>
+      <label for="search">대사·상황·캐릭터 검색</label>
+      <input id="search" type="search" placeholder="예: 복붙, 토요일, 컴돌이">
+      <label for="group">분류</label>
+      <select id="group"><option value="">전체</option></select>
+      <label class="checkbox"><input id="changed-only" type="checkbox"> 수정한 항목만</label>
+      <p id="count" role="status"></p>
+      <ul id="results" aria-label="대사 항목"></ul>
+    </section>
+    <section class="editor" aria-labelledby="context">
+      <header>
+        <p id="speaker"></p>
+        <h2 id="context"></h2>
+        <p id="details"></p>
+      </header>
+      <div id="lines"></div>
+      <div class="edit-actions">
+        <button id="add">대사 추가</button>
+        <button id="restore">기본 대사 복원</button>
+      </div>
+      <footer>
+        <button id="preview" class="primary">저장하고 게임에 미리 적용</button>
+        <button id="project">프로젝트 파일에 저장</button>
+        <button id="export">JSON 내보내기</button>
+        <label class="import">JSON 가져오기<input id="import" type="file" accept=".json,application/json"></label>
+      </footer>
+      <p id="status" role="status"></p>
+    </section>
+  </main>
+  <script type="module" src="editor.js"></script>
+</body>
+</html>

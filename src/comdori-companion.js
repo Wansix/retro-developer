@@ -1,5 +1,6 @@
+import { dialogueText } from "./dialogue-overrides.js";
 import { queueCompanionEvent, takeCompanionLine } from "./comdori-commentary.js";
-import { COMDORI_STANDBY, TUTORIAL_LINES } from "./comdori-lines.js";
+import { COMDORI_STANDBY, SURVIVAL_TUTORIAL_LINES, TUTORIAL_LINES } from "./comdori-lines.js";
 import { dialogueLine } from "./dialogue.js";
 
 const newDelay = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
@@ -66,7 +67,7 @@ export function mountOfficeCompanion({ getState, getShift, survival, paused, onC
     stop();
     if (!visible) return;
     mountedState = state;
-    text.textContent = state.last?.text ?? COMDORI_STANDBY;
+    text.textContent = state.last?.text ?? dialogueText("companion.standby", COMDORI_STANDBY);
     setEvent(state.last?.event);
     const inLesson = panel.dataset.event.startsWith("lesson:");
     place(inLesson);
@@ -125,13 +126,6 @@ export function mountOfficeCompanion({ getState, getShift, survival, paused, onC
     return true;
   }
 
-  const survivalLessons = {
-    time: "위는 남은 근무 시간입니다. 약속 타이머는 코드를 쓰거나 검색할 때 흐르고, 제출하면 업무 시간이 차감돼요.",
-    score: "업무가 끝나서 완료 건수와 평판이 올랐어요. 평판이 높으면 일을 더 가져올 수도 있습니다.",
-    stress: "스트레스가 60, 75, 90을 넘으면 업무 시간이 더 듭니다. 커피나 지뢰찾기에도 시간이 들어요.",
-    deadline: "두 번째 토요일이 최종 납품입니다. 필수 업무와 추가 일감을 끝내고 배포 검수를 통과하세요.",
-  };
-
   function teach(topic) {
     if (!timer) return;
     if (!topic) {
@@ -140,7 +134,7 @@ export function mountOfficeCompanion({ getState, getShift, survival, paused, onC
       typing = null;
       portrait.dataset.action = "idle";
       setEvent();
-      text.textContent = COMDORI_STANDBY;
+      text.textContent = dialogueText("companion.standby", COMDORI_STANDBY);
       highlight();
       place(false);
       return;
@@ -152,7 +146,10 @@ export function mountOfficeCompanion({ getState, getShift, survival, paused, onC
     highlight(topic);
     state.seen.push(id);
     state.pending = state.pending.filter(({ event }) => !["coding", "idle", "success"].includes(event));
-    state.last = { id, event: id, text: (survival() && survivalLessons[topic]) || TUTORIAL_LINES[topic], at: Date.now() };
+    const currentRules = survival() && Object.hasOwn(SURVIVAL_TUTORIAL_LINES, topic);
+    const text = dialogueText((currentRules ? "tutorial.current." : "tutorial.") + topic,
+      (currentRules ? SURVIVAL_TUTORIAL_LINES : TUTORIAL_LINES)[topic]);
+    state.last = { id, event: id, text, at: Date.now() };
     typing?.abort();
     say(state.last);
   }
