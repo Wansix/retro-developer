@@ -1,3 +1,4 @@
+import { hasSurvival, lowHealthStress, SURVIVAL } from "./survival.js";
 import { seededShuffle, seedValue } from "./seeded.js";
 
 export const MINE_SIZE = 5;
@@ -78,12 +79,12 @@ function caught(state) {
   const trustLoss = Math.min(14, 5 + 3 * count);
   state.stats.reportTrust = Math.max(0, state.stats.reportTrust - trustLoss);
   state.score -= count === 1 ? 5 : 8;
-  state.stress = Math.min(100, state.stress + 12);
+  state.stress = Math.min(100, state.stress + (hasSurvival(state) ? lowHealthStress(state, 12) : 12));
   if (count > 1) state.scope++;
   if (count >= 3) award(state, "현행범");
   leisure.visit++;
   closeLeisure(leisure, "caught");
-  state.effects = [`지뢰찾기 발각 · 보고 신뢰도 −${trustLoss} · 인사평가 −${count === 1 ? 5 : 8}${count > 1 ? " · 추가 일감 +1건" : ""}`];
+  state.effects = [`지뢰찾기 발각 · 보고 신뢰도 −${trustLoss} · ${hasSurvival(state) ? "평판" : "인사평가"} −${count === 1 ? 5 : 8}${count > 1 ? " · 추가 일감 +1건" : ""}`];
 }
 
 export function canOpenLeisure(state) {
@@ -109,7 +110,7 @@ function tick(state, seconds) {
         continue;
       }
     } else if (--leisure.untilAlert === 0) {
-      leisure.warning = MINE_WARNING_SECONDS;
+      leisure.warning = MINE_WARNING_SECONDS + (hasSurvival(state) && state.stats.reportTrust >= SURVIVAL.meetingTrust.high ? 2 : 0);
     }
     if (leisure.session % MINE_INTERVAL === 0) {
       spendBreak(state);
@@ -132,7 +133,8 @@ export function applyLeisure(state, action, value, mayOpen) {
       leisure.open = true;
       leisure.reason = "";
       leisure.session = 0;
-      leisure.untilAlert ||= 8 + seedValue(state.seed, 300 + leisure.visit) % 13;
+      const trusted = hasSurvival(state) && state.stats.reportTrust >= SURVIVAL.meetingTrust.high;
+      leisure.untilAlert ||= 8 + seedValue(state.seed, 300 + leisure.visit) % 13 + (trusted ? 4 : 0);
       spendBreak(state);
       return true;
     case "hide":

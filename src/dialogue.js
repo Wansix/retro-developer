@@ -106,3 +106,31 @@ export function dialogueLine(parent, text, options) {
   parent.append(spoken, visual);
   return typeDialogue(letters, text, options);
 }
+
+export function playDeadlineCue(kind) {
+  if (!enabled || context?.state !== "running" || document.hidden) return;
+  const phrases = {
+    soon: [610, 730],
+    exceeded: [330, 240],
+    burst: [165, 220, 196, 261],
+    shift: [147, 165],
+    typing: [530],
+  };
+  const notes = phrases[kind];
+  const music = kind === "burst" || kind === "shift";
+  const now = context.currentTime;
+  for (const [index, pitch] of notes.entries()) {
+    const start = now + index * (music ? .15 : .09);
+    const tone = context.createOscillator();
+    const level = context.createGain();
+    tone.type = "triangle";
+    tone.frequency.value = pitch;
+    level.gain.setValueAtTime(.001, start);
+    level.gain.linearRampToValueAtTime(music ? .018 : .033, start + .02);
+    level.gain.exponentialRampToValueAtTime(.001, start + .09);
+    tone.connect(level).connect(volume);
+    tone.onended = () => level.disconnect();
+    tone.start(start);
+    tone.stop(start + .10);
+  }
+}

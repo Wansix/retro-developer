@@ -38,14 +38,18 @@ export const documentMatchesTopics = (doc, topics) => {
   return topics.some(topic => tags.has(normalize(topic)));
 };
 
-export function recommendedIntranetArticles(mission) {
+export function relatedIntranetArticles(mission) {
   const topics = missionTopics(mission).map(normalize);
   const language = mission?.language ?? "python";
   return documents.filter(doc => (doc.language ?? "python") === language)
     .map(doc => ({ doc, matches: doc.tags.map(normalize).filter(tag => topics.includes(tag)).length }))
     .filter(({ matches }) => matches > 0)
     .sort((a, b) => b.matches - a.matches)
-    .slice(0, 3).map(({ doc }) => doc);
+    .map(({ doc }) => doc);
+}
+
+export function recommendedIntranetArticles(mission) {
+  return relatedIntranetArticles(mission).slice(0, 3);
 }
 
 function eraTopic(query) {

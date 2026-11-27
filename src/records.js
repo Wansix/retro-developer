@@ -1,5 +1,5 @@
 import { ENDINGS } from "./office-content.js";
-import { CATEGORIES, METRICS, formatDate, formatMinutes } from "./records-schema.js";
+import { CATEGORIES, METRICS, formatDate, formatMetric, internetRecordRows } from "./records-schema.js";
 import { workResultRows } from "./work-missions.js";
 
 const $ = (id) => document.getElementById(id);
@@ -91,10 +91,10 @@ function recordDetails(record) {
     const value = document.createElement("dd");
     term.textContent = name;
     value.textContent = key === "completedDay" ? record[key] ? formatDate(record.completedCalendarDay ?? record[key]) : "미완료"
-      : unit === "분" ? formatMinutes(record[key]) : `${record[key]}${unit}`;
+      : formatMetric(record[key], unit);
     stats.append(term, value);
   }
-  for (const [name, rate] of workResultRows(record)) {
+  for (const [name, rate] of [...internetRecordRows(record), ...workResultRows(record)]) {
     const term = document.createElement("dt");
     const value = document.createElement("dd");
     term.textContent = name;
@@ -145,7 +145,7 @@ async function renderRank() {
       const item = document.createElement("li");
       const result = document.createElement("strong");
       item.textContent = `${rank}위 · ${handle}`;
-      result.textContent = `${value}${CATEGORIES[category].unit}`;
+      result.textContent = formatMetric(value, CATEGORIES[category].unit);
       item.append(result);
       scores.append(item);
     }

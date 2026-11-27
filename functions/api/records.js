@@ -108,11 +108,17 @@ async function saveRun(db, account, body) {
 
 async function leaderboard(db, category) {
   if (!Object.hasOwn(CATEGORIES, category)) return problem("랭킹 종목이 올바르지 않습니다.", 400);
-  const { key, order, clears } = CATEGORIES[category];
+  const { key, order, clears, mode } = CATEGORIES[category];
+  const filters = [
+    "COALESCE(json_extract(summary, '$.timeMode'), '기본') != '완화'",
+    `json_extract(summary, '$.${key}') IS NOT NULL`,
+    ...(clears ? ["json_extract(summary, '$.completedDay') IS NOT NULL"] : []),
+    ...(mode === "legacy" ? ["json_extract(summary, '$.timeMode') IS NULL"] : mode === "survival" ? ["json_extract(summary, '$.timeMode') IS NOT NULL"] : []),
+  ];
   const best = order === "ASC" ? "MIN" : "MAX";
   const { results } = await db.prepare(`WITH best_runs AS (
     SELECT account_id, ${best}(json_extract(summary, '$.${key}')) AS value
-    FROM runs ${clears ? "WHERE json_extract(summary, '$.completedDay') IS NOT NULL" : ""}
+    FROM runs WHERE ${filters.join(" AND ")}
     GROUP BY account_id
   )
   SELECT accounts.handle, value, DENSE_RANK() OVER (ORDER BY value ${order}) AS rank

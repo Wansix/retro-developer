@@ -3,17 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
-<title>옛날 개발자 v0.9.2 — 퇴근하고 싶다</title>
-<link rel="stylesheet" href="src/style.css?v=39">
+<title>옛날 개발자 v0.10.1 — 퇴근하고 싶다</title>
+<link rel="stylesheet" href="src/style.css?v=43">
 </head>
 <body>
   <!-- 타이틀 -->
   <section id="screen-title" class="screen active">
     <div class="terminal">
-      <h1>《옛날 개발자》 <span class="game-version">v0.9.2</span></h1>
+      <h1>《옛날 개발자》 <span class="game-version">v0.10.1</span></h1>
       <p class="sub">코딩은 쉬운데 퇴근이 어려운 게임.</p>
       <p class="line">2026년, 어느 개발자의 퇴근 2분 전.</p>
       <button id="btn-start" class="btn">게임 시작</button>
+      <label class="timer-setting"><input id="relaxed-timer" type="checkbox"> 업무 제한 시간 완화 · 랭킹 제외</label>
       <button id="btn-skip-intro" class="btn hidden">인트로 스킵하고 바로 출근</button>
       <button id="btn-resume" class="btn primary hidden">이어 하기</button>
       <button id="title-records" class="btn">계정·랭킹</button>
@@ -106,7 +107,7 @@
   <!-- 타이틀 카드 -->
   <section id="screen-titlecard" class="screen">
     <div class="titlecard">
-      <h1 class="bigtitle">옛날 개발자 <span class="game-version">v0.9.2</span></h1>
+      <h1 class="bigtitle">옛날 개발자 <span class="game-version">v0.10.1</span></h1>
       <p class="tagline">미래소프트™ 개발 3팀</p>
       <p class="tagline2">코딩은 쉬운데 퇴근이 어려운 게임.</p>
       <button id="btn-gotowork" class="btn primary">첫 출근하기</button>
@@ -117,7 +118,7 @@
     <header id="hud">
       <div class="hud-item"><span class="hud-label"><span class="stat-icon" aria-hidden="true">▦</span>입사</span><strong id="hud-date"></strong></div>
       <div class="hud-item"><span class="hud-label"><span class="stat-icon deadline-icon" aria-hidden="true">⚑</span>마감</span><strong id="hud-dday"></strong></div>
-      <div id="hud-time-item" class="hud-item hidden"><span class="hud-label"><span class="stat-icon time-icon" aria-hidden="true">◷</span>업무 시간</span><strong id="hud-time"></strong></div>
+      <div id="hud-time-item" class="hud-item hidden"><span class="hud-label"><span class="stat-icon time-icon" aria-hidden="true">◷</span>업무 시간</span><strong id="hud-time"></strong><span id="internet-time-loss" aria-hidden="true"></span></div>
       <div class="hud-item gauge"><span class="hud-label"><span class="stat-icon health-icon" aria-hidden="true">♥</span>체력</span>
         <div class="bar" aria-hidden="true"><div id="bar-hp" class="bar-fill hp"></div></div><span id="hud-hp" class="hud-val"></span>
       </div>
@@ -126,7 +127,7 @@
         <div class="bar" aria-hidden="true"><div id="bar-progress" class="bar-fill prog"></div></div><span id="hud-progress" class="hud-val"></span>
       </div>
       <div class="hud-item"><span class="hud-label"><span class="stat-icon" aria-hidden="true">▤</span>추가 일감</span><strong id="hud-scope"></strong></div>
-      <div class="hud-item"><span class="hud-label"><span class="stat-icon score-icon" aria-hidden="true">★</span>인사평가</span><strong id="hud-score"></strong></div>
+      <div class="hud-item"><span class="hud-label"><span class="stat-icon score-icon" aria-hidden="true">★</span><span id="hud-score-label">인사평가</span></span><strong id="hud-score"></strong></div>
       <div id="scrum-trust" class="hud-item hidden"><span class="hud-label"><span class="stat-icon trust-icon" aria-hidden="true">✓</span>보고 신뢰도</span><strong id="hud-trust"></strong></div>
       <button id="mines-launch" class="act-btn hidden" type="button">▦ 지뢰찾기</button>
       <button id="office-sidebar-toggle" class="act-btn hidden" type="button" popovertarget="office-sidebar">일정·관계</button>
@@ -195,6 +196,12 @@
       </section>
 
       <main id="work-panel">
+        <div id="task-tools" class="hidden">
+          <div id="task-clock" class="hidden"><span id="task-clock-label">약속까지</span> <strong id="task-countdown" role="timer"></strong><span id="task-alert" class="visually-hidden" role="status"></span></div>
+          <button id="task-defer" class="act-btn hidden" type="button" aria-label="업무를 다음 근무일로 이월 · 보고 신뢰도 4 감소">업무 이월</button>
+          <button id="burst-launch" class="act-btn hidden" type="button">BURST MODE</button>
+          <div id="burst-status" class="hidden" role="status"></div>
+        </div>
         <div id="office-lesson" class="hidden"></div>
         <div class="office-briefing">
           <section id="shift-panel" aria-labelledby="shift-title">
@@ -269,6 +276,7 @@
             <div class="editor-head"><span>실행 결과</span></div>
             <pre id="output" role="status" tabindex="0"></pre>
           </div>
+          <p id="internet-open-status" role="status"></p>
           <section id="desk-internet" class="hidden" aria-labelledby="internet-title">
             <header class="internet-caption">
               <h2 id="internet-title">▣ 미래넷 브라우저</h2>
@@ -279,12 +287,8 @@
               <button id="internet-home" type="button">처음</button>
               <button id="internet-history" type="button">기록</button>
             </nav>
-            <form id="internet-search">
-              <label for="internet-query">검색</label>
-              <input id="internet-query" type="search" maxlength="96" placeholder="함수, TypeError…" required autocomplete="off" spellcheck="false">
-              <button type="submit">검색</button>
-            </form>
             <p id="internet-location" aria-label="브라우저 위치"></p>
+            <p id="internet-notice" role="status"></p>
             <div id="internet-view" tabindex="0" aria-live="polite"></div>
           </section>
         </section>
@@ -343,11 +347,12 @@
         <dd>제출과 회의에 시간이 들어요. 지금 시각은 사무실 시계에서 봐요.</dd>
         <dt><span class="stat-icon trust-icon" aria-hidden="true">✓</span>보고 신뢰도</dt>
         <dd>스크럼에서 솔직히 보고하고 약속을 지키면 올라가요.</dd>
-        <dt><span class="stat-icon score-icon" aria-hidden="true">★</span>인사평가</dt>
-        <dd>업무 성과와 선택에 따라 바뀌고, 엔딩에도 영향을 줘요.</dd>
+        <dt><span class="stat-icon score-icon" aria-hidden="true">★</span><span id="guide-score-label">인사평가</span></dt>
+        <dd id="guide-score-copy">업무 성과와 선택에 따라 바뀌고, 엔딩에도 영향을 줘요.</dd>
         <dt><span class="stat-icon deadline-icon" aria-hidden="true">⚑</span>마감</dt>
         <dd id="guide-deadline-copy"></dd>
       </dl>
+      <label id="burst-setting" class="timer-setting"><input id="burst-effects" type="checkbox" checked> 긴장 연출과 효과음</label>
       <form method="dialog"><button class="btn primary" autofocus>닫기</button></form>
     </dialog>
     <dialog id="mines-window" aria-labelledby="mines-title">
@@ -420,6 +425,6 @@
       <button id="records-back" class="btn">돌아가기</button>
     </div>
   </section>
-  <script type="module" src="src/main.js?v=41"></script>
+  <script type="module" src="src/main.js?v=43"></script>
 </body>
 </html>

@@ -3,26 +3,28 @@ import { DEPARTMENTS, ENDINGS, EPILOGUE } from "./office-content.js";
 import { CAST_NAMES, officeScene } from "./office-scenes.js";
 import {
   CLEANUP_MINUTES, CODE_DELEGATION, CODE_REVIEW_MINUTES, DEBUG_PASS_MOVE, PHASES, RELATION_NAMES, act, canDelegateCode, canReviewCode,
-  canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, hasDirectAssignments,
+  canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, failPracticeRun, hasDirectAssignments,
   hasChainedWork, hasLanguageAssignment, hasOfficeClock, hasProblemBank, hasSaturdayShift, hasShortProject, hasWorkContent, isCoding, isFriday, isHalfDay, isTutorial, missionCount,
   missionNotice, needsAssignment, newRun, nextAssignment, officeTime, options, passWorkForDebug, projectDay, recordFor, recordPaste, requestCodeReview,
-  submitSolution, submitSpecialWork,
+  submitSolution, submitSpecialWork, deferWork, enableRelaxed, taskIsOpen, useBurst, useInternet,
 } from "./office.js";
 import { WORK_TYPES, workResultRows } from "./work-missions.js";
 import { buildWorkBoard } from "./work-ui.js";
 import { mountMinesWindow } from "./mines-ui.js";
 import { mountIntranet } from "./intranet-ui.js";
-import { commentOnInternetSolution, newInternetState } from "./intranet-search.js";
+
 import { newCompanionState } from "./comdori-commentary.js";
 import { mountOfficeCompanion } from "./comdori-companion.js";
-import { FIRST_RULESET, METRICS, PROJECT_WORKDAYS, TOTAL_DAYS, formatDate, formatMinutes } from "./records-schema.js";
+import { FIRST_RULESET, METRICS, PROJECT_WORKDAYS, TOTAL_DAYS, formatDate, formatMetric, formatMinutes, internetRecordRows } from "./records-schema.js";
 import { SCRUM_REPORTS } from "./scrum.js";
 import { initRecords, openRecords, syncRecord } from "./records.js";
-import { dialogueLine, initDialogueSound, playFootsteps, typeDialogue } from "./dialogue.js";
+import { dialogueLine, initDialogueSound, playDeadlineCue, playFootsteps, typeDialogue } from "./dialogue.js";
 import { playIntro } from "./intro.js";
 import { OPENING_WORK, PROJECT_GOAL } from "./project-work.js";
 import { LANGUAGES } from "./office-languages.js";
 import { mountOfficePresence } from "./office-presence.js";
+import { mountWorkTimer } from "./work-timer-ui.js";
+import { hasSurvival, SURVIVAL } from "./survival.js";
 import { mountCodeHighlight } from "./code-highlight.js";
 
 const $ = (id) => document.getElementById(id);
@@ -35,7 +37,7 @@ const coworkerHelp = $("coworker-help");
 let state;
 let draft = null;
 let workDraft = null;
-let internetState = newInternetState();
+let internetState = { open: false, tabs: {} };
 let companionState = newCompanionState();
 let presenceSeen = [];
 let shownMission;
@@ -78,6 +80,7 @@ function show(id) {
   window.scrollTo(0, 0);
   companion.sync(id === "screen-office");
   if (id !== "screen-office") intranet.sync(false);
+  taskTimer.sync();
   if (id !== "screen-office" && coworkerHelp.matches(":popover-open")) coworkerHelp.hidePopover();
   minesWindow.sync();
 }
@@ -214,12 +217,45 @@ function saveLocal(key, value) {
 }
 
 function checkpoint() {
-  if (!state.ending) saveLocal(RUN_KEY, { state, draft, workDraft, internetState, companionState, presenceSeen });
+  if (state && !state.ending) saveLocal(RUN_KEY, { state, draft, workDraft, internetState, companionState, presenceSeen });
 }
+
+const inOffice = () => $("screen-office").classList.contains("active");
+const taskTimer = mountWorkTimer({
+  getState: () => state,
+  isActive: inOffice,
+  isPaused: () => busy || document.hidden || !!state?.leisure?.open || !!officeLines.length ||
+    !!$("office-scene").dataset.speaking || !!document.querySelector("dialog[open]") || coworkerHelp.matches(":popover-open"),
+  researching: () => $("desk-internet").contains(document.activeElement),
+  save: checkpoint,
+  onDefer() {
+    taskTimer.flush();
+    if (busy || !deferWork(state)) return;
+    if (state.ending) endRun();
+    else renderOffice(true);
+  },
+  onBurst() {
+    taskTimer.flush();
+    if (busy || !useBurst(state)) return;
+    renderOffice();
+    companion.emit("burst");
+    bossSay("신입, 이렇게 빨리 할 수 있었는데 그동안 뭐 한 거야?");
+  },
+  onBudgetChange() {
+    renderChoices();
+    renderCoding();
+    renderWorkChallenge();
+  },
+  onTimeout() {
+    hud();
+    bossSay("신입, 약속 시간 지났어. 검수는 계속해. 일정은 다시 얘기하자.");
+  },
+});
 
 const companion = mountOfficeCompanion({
   getState: () => companionState,
   getShift: () => state?.shift ?? 0,
+  survival: () => !!state && hasSurvival(state),
   paused: () => officeGuide.open || coworkerHelp.matches(":popover-open") || $("challenge-help").open || !!state?.leisure?.warning,
   onChange: checkpoint,
   onLessonNext() {
@@ -240,10 +276,32 @@ const presence = mountOfficePresence({
 });
 
 const intranet = mountIntranet({
-  getState: () => internetState,
+  getUi: () => internetState,
+  getRun: () => state,
   getMission: () => state && currentMission(state),
   onChange() { checkpoint(); resetIdle(); },
-  onComment: event => companion.emit(event === "search" ? "search" : `web-${event}`),
+  spend(action, id) {
+    if (busy) return false;
+    taskTimer.flush();
+    const result = useInternet(state, action, id);
+    if (!result) return false;
+    if (state.ending) {
+      endRun();
+      return false;
+    }
+    if (result.minutes) {
+      hud();
+      const loss = $("internet-time-loss");
+      loss.textContent = `−${result.minutes}분`;
+      loss.getAnimations().forEach(animation => animation.cancel());
+      loss.animate([{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: officeReducedMotion.matches ? "none" : "translateY(-.45rem)" }],
+        { duration: 950, fill: "both" });
+      renderChoices();
+      renderCoding();
+    }
+    return result;
+  },
+  onComment: event => companion.emit(`web-${event}`),
 });
 
 const MINES_BEST_KEY = "retro-mines-best-v1";
@@ -261,6 +319,7 @@ const minesWindow = mountMinesWindow({
   },
   onWarning: playFootsteps,
   onChange({ closed, timeChanged, opened }) {
+    if (state.ending) return endRun();
     if (closed) {
       renderOffice();
       if (closed === "caught") {
@@ -432,7 +491,7 @@ function peekAtClock() {
 function hud() {
   if (clockPeekPhase && clockPeekPhase !== clockPhase()) hideClockTime();
   else if (clockPeekPhase) updateClockReadout();
-  $("hud-date").textContent = `${projectDay(state)}일차 · ${formatDate(state.day)}`;
+  $("hud-date").textContent = state.phase === "sunday" ? formatDate(state.day) : `${projectDay(state)}일차 · ${formatDate(state.day)}`;
   $("hud-dday").textContent = `D-${projectDay(state, state.deadline) - projectDay(state)}`;
   $("hud-dday").title = hasShortProject(state) ? "남은 근무일 기준" : "남은 날짜 기준";
   $("hud-hp").textContent = state.hp;
@@ -448,7 +507,7 @@ function hud() {
   $("hud-progress-label").textContent = hasChainedWork(state) ? "완료 업무" : "기능";
   $("hud-progress").textContent = `${progress}/${missionCount(state)}`;
   $("bar-progress").style.width = `${100 * progress / missionCount(state)}%`;
-  $("hud-score").textContent = hasChainedWork(state) ? `${state.score}/${PROJECT_GOAL.score}` : state.score;
+  $("hud-score").textContent = hasChainedWork(state) && !hasSurvival(state) ? `${state.score}/${PROJECT_GOAL.score}` : state.score;
   $("hud-scope").textContent = `${state.scope}건`;
   $("hud-time-item").classList.toggle("hidden", !isCoding(state.phase));
   $("hud-time").textContent = formatMinutes(state.remaining);
@@ -458,6 +517,7 @@ function hud() {
   $("scrum-trust").classList.toggle("hidden", !state.scrum || learning);
   $("relation-panel").classList.toggle("hidden", learning);
   $("office-sidebar-toggle").textContent = learning ? "일정" : "일정·관계";
+  $("hud-score-label").textContent = hasSurvival(state) ? "사내 평판" : "인사평가";
   if (state.scrum) $("hud-trust").textContent = `${state.stats.reportTrust}/100`;
   $("relations").replaceChildren(...Object.entries(RELATION_NAMES).flatMap(([id, name]) => {
     const dt = document.createElement("dt");
@@ -489,6 +549,7 @@ function hud() {
     if (learning) visible = (fullDay ? ["arrive", "morning", "lunch", "afternoon", "report", "leave"] :
       ["arrive", "morning", "leave"]).includes(step);
     if (halfDay && ["lunch", "negotiate", "afternoon", "report"].includes(step)) visible = false;
+    if (state.phase === "sunday") visible = false;
     node.classList.toggle("hidden", !visible);
     if (step === active) node.setAttribute("aria-current", "step");
     else node.removeAttribute("aria-current");
@@ -506,9 +567,10 @@ function phaseStory() {
   const puzzle = !state.solvedToday && mission?.type && mission.type !== "code";
   $("shift-title").textContent = puzzle && isCoding(phase) ? title.replace("코딩", "업무") : events;
   switch (phase) {
+    case "sunday": return "오늘은 출근하지 않는다. 월요일에 다시 출입증을 찍기 전까지 어떻게 쉴까?";
     case "arrive": {
       if (isHalfDay(state)) {
-        $("shift-title").textContent = "토요일 오전 근무";
+        $("shift-title").textContent = hasSurvival(state) && state.shift === SURVIVAL.deliveryShift ? "마지막 토요일 · 최종 납품" : "토요일 오전 근무";
         return `오늘은 12시 퇴근이다. ${state.event.text}`;
       }
       if (!isTutorial(state)) return state.event.text;
@@ -535,7 +597,7 @@ function phaseStory() {
         if (offer) {
           const missing = codingCost(state, offer) - state.remaining;
           if (missing <= 0) return `${budget} 김 과장이 다음 업무를 가져왔다.`;
-          const handoff = isHalfDay(state) ? "월요일에 이어서 배정한다." :
+          const handoff = isHalfDay(state) ? (hasSurvival(state) ? "정오에 추가 근무를 결정한다." : "월요일에 이어서 배정한다.") :
             phase === "morning" && (fullDay || !isTutorial(state)) ? "점심 이후에 이어서 배정한다." : "배정표에 남겨 뒀다.";
           return `${budget} ‘${offer.notice ?? offer.title}’에 ${formatMinutes(missing)}이 부족하다. ${handoff}`;
         }
@@ -547,9 +609,17 @@ function phaseStory() {
         return `${budget} 오늘 배정분을 마쳤다.${state.shift < projectDay(state, state.deadline) ? " 새 업무는 내일 들어온다." : ""}`;
       }
       if (!mission) return `${budget} 필수 기능 검수가 끝났다. 남은 추가 일감을 정리하고 퇴근하면 배포할 수 있다.`;
-      if (state.solvedToday) return `${budget} 오늘 배정된 업무는 검수를 통과했다.`;
-      if (isTutorial(state) && (!hasChainedWork(state) || state.activeWork === OPENING_WORK)) {
+      if (state.solvedToday && !hasSurvival(state)) return `${budget} 오늘 배정된 업무는 검수를 통과했다.`;
+      if ((!hasSurvival(state) || state.task) && isTutorial(state) && (!hasChainedWork(state) || state.activeWork === OPENING_WORK)) {
         return "아래에 코드를 한 줄 입력하세요. 실행으로 결과를 확인하고 업무 제출을 누르면 됩니다.";
+      }
+      if (hasSurvival(state)) {
+        if (state.solvedToday) return `${budget} 업무표에 남겨 두었다. 다음 근무일에 초안부터 이어간다.`;
+        if (!state.task) {
+          $("shift-title").textContent = mission.notice ?? mission.title;
+          return `${budget} 예상 ${missionNotice(state).estimate}. 김 과장 ‘신입, 이거 얼마나 걸려?’`;
+        }
+        return `${budget} 약속 시간을 넘겨도 제출할 수 있다. 남은 업무 시간을 확인하자.`;
       }
       const needed = codingCost(state);
       if (hasChainedWork(state)) {
@@ -574,7 +644,10 @@ function phaseStory() {
       return hasChainedWork(state) ? `오늘 ${state.workDoneToday}건 완료 · ${projectStatus()}` :
         `기능 ${state.progress}/${missionCount(state)} · 추가 일감 ${state.scope}건. 김 과장이 현황을 묻는다.`;
     case "leave": {
-      if (isHalfDay(state)) return "토요일 오전 근무를 마쳤다. 남은 업무는 월요일에 이어서 한다.";
+      if (isHalfDay(state)) return hasSurvival(state) ?
+        state.deliverySubmitted ? "검수 합격. 고객사에 납품 메일을 보냈다." :
+          "11시 55분. 김 과장이 점심 얘기를 꺼냈다. 오전에 돌아갈지, 남아서 일을 끝낼지 고른다." :
+        "토요일 오전 근무를 마쳤다. 남은 업무는 월요일에 이어서 한다.";
       if (isTutorial(state)) return "남은 업무는 다음 출근 때 이어서 할 수 있다.";
       return hasChainedWork(state) ? projectStatus() : "김 과장이 벽시계를 한 번 보고 자리에 앉는다.";
     }
@@ -607,8 +680,8 @@ function currentLesson() {
     if (state.phase === "morning") {
       const mission = currentMission(state);
       if (state.solvedToday && (state.workDoneToday ?? 1) === 1) return "score";
-      if (mission?.id === MISSIONS[0].id && !state.solvedToday) return "time";
-      if (mission?.fundamentals) return "practice";
+      if (mission?.id === MISSIONS[0].id && !state.solvedToday && taskIsOpen(state)) return "time";
+      if (mission?.fundamentals && taskIsOpen(state)) return "practice";
     }
   } else if (state.shift === 2) {
     return { scrum: "trust", negotiate: "scope", report: "deadline" }[state.phase];
@@ -616,6 +689,7 @@ function currentLesson() {
 }
 
 function projectStatus() {
+  if (hasSurvival(state)) return `필수 업무 ${state.progress}/${PROJECT_GOAL.work}건 · 추가 일감 ${state.scope}건 · ${state.deliverySubmitted ? "배포 검수 완료" : "두 번째 토요일 최종 검수"}`;
   const delivery = state.deliverySubmitted ? "배포 검수 완료" : state.shift < PROJECT_GOAL.deploymentDay ?
     `배포 검수 ${PROJECT_GOAL.deploymentDay}일차부터` :
     state.progress < PROJECT_GOAL.work - 1 ? `업무 ${PROJECT_GOAL.work - 1}건 완료 시 배포 검수` : "배포 검수 대기";
@@ -667,7 +741,7 @@ function renderScrum() {
 }
 
 function submissionNextAction(choices) {
-  if (!isCoding(state.phase) || !currentMission(state) || state.solvedToday || state.remaining >= codingCost(state)) return;
+  if (!taskIsOpen(state) || !isCoding(state.phase) || !currentMission(state) || state.solvedToday || state.remaining >= codingCost(state)) return;
   const prepare = choices.find(({ id, disabled }) => id === "prepare" && !disabled);
   return state.phase !== "overtime" && prepare ? prepare : choices.find(({ id }) => id === "next");
 }
@@ -675,6 +749,7 @@ function submissionNextAction(choices) {
 function takeOfficeAction(id) {
   const previousPhase = state.phase;
   const previousMeetings = state.stats.meetings;
+  taskTimer.flush();
   if (busy || !act(state, id)) return;
   if (state.ending) {
     endRun();
@@ -683,7 +758,7 @@ function takeOfficeAction(id) {
   if (id.startsWith("stack-")) preloadCpp();
   renderOffice(true, { reaction: id === "coffee" ? "coffee" : null });
   if (id === "tutorialHelp") intranet.openHome();
-  if (id === "stay") companion.emit("overtime");
+  if (id === "stay" || id === "saturday-meal") companion.emit("overtime");
   if (id === "leave") companion.emit("leave");
   if (state.stats.meetings - previousMeetings >= 40) companion.emit("meetingLong");
   else if (state.phase !== previousPhase && (state.phase === "scrum" || state.phase === "report")) companion.emit("meeting");
@@ -731,12 +806,12 @@ function renderCodingSupport(mission) {
   $("mission-delegate").disabled = busy || !canDelegateCode(state);
   const { minutes, score, trust, relation } = CODE_DELEGATION;
   $("mission-delegation-cost").textContent =
-    `업무 시간 최대 ${formatMinutes(minutes)} · 인사평가 −${score} · 보고 신뢰도 −${trust} · 이 대리 관계 −${relation}. 프로젝트는 한 단계 진행돼요.`;
+    `${hasSurvival(state) ? "지금까지 쓴 시간 + " : "업무 시간 최대 "}${formatMinutes(minutes)} · ${hasSurvival(state) ? "평판" : "인사평가"} −${score} · 보고 신뢰도 −${trust} · 이 대리 관계 −${relation}.`;
 }
 
 function renderCoding() {
   const mission = currentMission(state);
-  const visible = isCoding(state.phase) && mission && (!mission.type || mission.type === "code") && !state.solvedToday;
+  const visible = taskIsOpen(state) && isCoding(state.phase) && mission && (!mission.type || mission.type === "code") && !state.solvedToday;
   $("coding-panel").classList.toggle("hidden", !visible);
   intranet.sync(!!visible);
   if ((!visible || shownMission !== mission.id) && coworkerHelp.matches(":popover-open")) coworkerHelp.hidePopover();
@@ -757,6 +832,7 @@ function renderCoding() {
     editor.scrollLeft = 0;
     paintEditor(language);
     $("paste-warning").textContent = "";
+    $("internet-open-status").textContent = "";
     output("실행 버튼을 눌러 결과를 확인하세요.");
   }
   renderCodingSupport(mission);
@@ -766,7 +842,7 @@ function renderCoding() {
   $("code-debug-pass").disabled = busy || !canSubmit(state);
   const missing = cost - state.remaining;
   const next = submissionNextAction(options(state));
-  const followup = isHalfDay(state) ? "정오에 퇴근한 뒤 월요일에 이어서 할 수 있어요."
+  const followup = isHalfDay(state) ? (hasSurvival(state) ? "정오 퇴근 준비에서 추가 근무를 고를 수 있어요." : "정오에 퇴근한 뒤 월요일에 이어서 할 수 있어요.")
     : isTutorial(state) && !hasOfficeClock(state) && state.phase === "morning"
     ? "퇴근 준비 후 야근을 선택하거나 다음 출근에 이어서 할 수 있어요."
     : next?.id === "prepare"
@@ -787,7 +863,7 @@ function renderCoding() {
 
 function renderWorkChallenge() {
   const mission = currentMission(state);
-  const visible = isCoding(state.phase) && mission?.type && mission.type !== "code" && !state.solvedToday;
+  const visible = taskIsOpen(state) && isCoding(state.phase) && mission?.type && mission.type !== "code" && !state.solvedToday;
   $("work-challenge").classList.toggle("hidden", !visible);
   if (!visible) return;
   if (shownChallenge !== mission.id) {
@@ -815,6 +891,7 @@ function renderWorkChallenge() {
 }
 
 function submitChallenge(answer) {
+  taskTimer.flush();
   if (answer == null) {
     $("challenge-feedback").textContent = "먼저 업무 화면에서 답을 완성해 주세요.";
     return;
@@ -825,9 +902,9 @@ function submitChallenge(answer) {
     return;
   }
   presence.work();
+  if (result.passed) workDraft = null;
+  if (state.ending) return endRun();
   if (result.passed) {
-    workDraft = null;
-    if (state.ending) return endRun();
     renderOffice(true);
     if (!isTutorial(state)) bossSay("검수 통과야. 수고했어, 신입.");
   } else {
@@ -855,6 +932,7 @@ function renderOffice(focus = false, { reaction } = {}) {
   $("screen-office").classList.toggle("office-active-work", !!activePane);
   minesWindow.sync();
   companion.teach(currentLesson());
+  taskTimer.sync();
   checkpoint();
   if (focus) {
     let target = $("name-form").classList.contains("hidden") ? activePane ?? "shift-title" : "player-name";
@@ -875,8 +953,14 @@ function renderOffice(focus = false, { reaction } = {}) {
       : `그래? 우리 팀은 ${LANGUAGES[state.language].name} 쓰는데. 처음이면 하면서 배우면 돼. 오늘까지야.`);
   } else if (lesson) {
     bossSay(lesson);
+  } else if (state.phase === "sunday") {
+    officeSay("me", "오늘만큼은 호출기를 꺼 둬도 되겠지.");
+    companion.emit("sunday");
   } else if (isHalfDay(state) && state.phase === "leave") {
-    bossSay("열두 시 됐어, 신입. 남은 건 월요일에 하자.");
+    bossSay(hasSurvival(state) ? (state.deliverySubmitted ? "납품 메일 보냈어. 신입, 이제 가 봐." :
+      "오늘 오전까지만 하랬지. 근데 다들 점심은 먹고 갈 거지?") : "열두 시 됐어, 신입. 남은 건 월요일에 하자.");
+  } else if (hasSurvival(state) && !state.task && !state.solvedToday && isCoding(state.phase) && currentMission(state)) {
+    bossSay("신입, 이거 얼마나 걸려?");
   } else if (scene) {
     playOfficeScene(scene);
   } else if (state.phase === "arrive") {
@@ -901,11 +985,19 @@ function renderOffice(focus = false, { reaction } = {}) {
 function showOfficeGuide() {
   $("guide-stress-label").classList.toggle("hidden", !hasWorkContent(state));
   $("guide-stress-copy").classList.toggle("hidden", !hasWorkContent(state));
-  $("guide-deadline-copy").textContent = hasChainedWork(state)
+  const survival = hasSurvival(state);
+  $("burst-setting").classList.toggle("hidden", !survival);
+  $("guide-score-label").textContent = survival ? "사내 평판" : "인사평가";
+  $("guide-score-copy").textContent = survival ? "평판이 높으면 배정 순서와 동료 협조에 유리해요. 에이스에게는 급한 일도 몰려요." : "업무 성과와 선택에 따라 바뀌고, 엔딩에도 영향을 줘요.";
+  $("guide-stress-copy").textContent = survival ? "60 이상이면 제출 +5분, 75 이상 +10분, 90 이상 +20분이에요. 휴식도 업무 시간을 써요." :
+    "75 이상이면 제출에 10분이 더 걸려요. 지뢰찾기는 업무 시간을 써서 스트레스를 낮춰요.";
+  $("guide-deadline-copy").textContent = survival ?
+    `3월 6~19일, ${SURVIVAL.calendarDays}일 동안 ${SURVIVAL.workdays}일 근무합니다. 3월 18일 토요일에 업무 ${PROJECT_GOAL.work}건과 추가 일감을 정리하고 최종 배포 검수를 통과하세요. D-2부터 체력을 써서 한 번 초집중할 수 있어요.` : hasChainedWork(state)
     ? `10근무일 안에 업무 ${PROJECT_GOAL.work}건(배포 검수 포함)과 평가 ${PROJECT_GOAL.score}점을 채우고 추가 일감을 0건으로 만드세요.${hasSaturdayShift(state) ? " 토요일 오전도 근무일에 포함돼요." : ""}`
     : hasShortProject(state)
     ? `주말을 빼고 근무일 ${PROJECT_WORKDAYS}일 안에 프로젝트를 끝내세요.`
     : `${TOTAL_DAYS}일 안에 프로젝트를 끝내면 2026년으로 돌아가요.`;
+  taskTimer.flush();
   officeGuide.showModal();
   resetIdle();
 }
@@ -913,9 +1005,10 @@ function showOfficeGuide() {
 function enterOffice(resume = false) {
   const saved = resume ? loadLocal(RUN_KEY) : null;
   state = saved?.state ?? newRun();
+  if (!saved?.state && $("relaxed-timer").checked) enableRelaxed(state);
   draft = saved?.draft ?? null;
   workDraft = saved?.workDraft ?? null;
-  internetState = saved?.internetState ?? newInternetState();
+  internetState = saved?.internetState ?? { open: false, tabs: {} };
   companionState = saved?.companionState ?? newCompanionState();
   presenceSeen = saved?.presenceSeen ?? [];
   presence.reset();
@@ -1013,9 +1106,11 @@ function runCode(language, code, check, verify) {
 }
 
 async function handleCode(submit) {
-  if (busy || (submit && !canSubmit(state))) return;
+  taskTimer.flush();
+  if (busy || !taskIsOpen(state) || (submit && !canSubmit(state))) return;
   presence.work();
   busy = true;
+  taskTimer.sync();
   minesWindow.sync();
   renderChoices();
   renderCoding();
@@ -1027,10 +1122,13 @@ async function handleCode(submit) {
   output(runner?.ready ? `${label} 실행 중…` : `${label} 실행기를 준비하고 있어요. 첫 실행은 조금 더 걸려요.`);
   const result = await runCode(language, editor.value, mission.check, submit).catch(() => ({ unavailable: true }));
   busy = false;
+  taskTimer.sync();
   const wrongRun = !submit && result.ok && result.passed === false;
-  const retryMinutes = submit && !result.unavailable && (!result.ok || !result.passed) ? failCodeSubmission(state) : false;
+  const failed = !result.unavailable && (!result.ok || result.passed === false);
+  const retryMinutes = failed ? (submit ? failCodeSubmission(state) : failPracticeRun(state)) : false;
   $("office-title").disabled = false;
   $("office-guide-open").disabled = false;
+  if (state.ending) return endRun();
   if (result.unavailable) output(`${label} 실행기를 불러오지 못했습니다. 연결을 확인한 뒤 다시 실행하세요.`, "error");
   else if (result.timeout) output("실행 제한 시간에 도달했어요. 반복문의 종료 조건을 확인하세요.", "error");
   else if (!result.ok) output(result.error || "실행 오류가 발생했습니다.", "error");
@@ -1050,7 +1148,7 @@ async function handleCode(submit) {
     submitSolution(state);
     draft = null;
     if (state.ending) return endRun();
-    const internetComment = commentOnInternetSolution(internetState, mission);
+    const internetComment = state.web?.jobs[mission.id]?.assisted;
     renderOffice(true, { reaction: state.scope > 0 && state.phase === "morning" ? "success" : null });
     companion.emit(internetComment ? `web-${internetComment}` : "success");
   } else {
@@ -1085,6 +1183,7 @@ editor.addEventListener("beforeinput", (event) => {
 });
 editor.addEventListener("input", () => {
   draft = { id: currentMission(state).id, code: editor.value };
+  if (state.burst?.remaining && $("burst-effects").checked) playDeadlineCue("typing");
   checkpoint();
   resetIdle();
 });
@@ -1110,14 +1209,15 @@ function showResult(record) {
     label,
     key === "completedDay"
       ? record[key] === null ? "미완료" : `입사 ${record[key]}일차 · ${formatDate(record.completedCalendarDay ?? record[key])}`
-      : unit === "분" ? formatMinutes(record[key]) : `${record[key]}${unit}`,
+      : formatMetric(record[key], unit),
   ]);
   rows.push([record.workResults ? "완료한 업무 미션" : "완료한 코딩 미션",
     record.scoreGoal ? `${record.progress}건 · 목표 ${record.missionTotal}건` : `${record.progress}/${record.missionTotal ?? MISSIONS.length}`]);
   if (record.language) rows.push(["배정 언어", LANGUAGES[record.language].name]);
   if (record.scoreGoal) rows.push(["최종 인사평가", `${record.score} / ${record.scoreGoal}점`],
     ["배포 검수", record.deliverySubmitted ? "완료" : "미완료"], ["남은 추가 일감", `${record.scope}건`]);
-  rows.push(...workResultRows(record));
+  if ("projectDelivered" in record) rows.push(["배포 검수", record.deliverySubmitted ? "완료" : "미완료"], ["남은 추가 일감", `${record.scope}건`]);
+  rows.push(...internetRecordRows(record), ...workResultRows(record));
   document.querySelector("#ending-table tbody").replaceChildren(...rows.map(([label, value]) => {
     const row = document.createElement("tr");
     const header = document.createElement("th");
@@ -1130,7 +1230,7 @@ function showResult(record) {
   }));
   replaceList($("ending-award"), record.achievements.map((title) => `업적 · ${title}`));
   const best = loadLocal(BEST_KEY);
-  $("ending-best").textContent = best ? `이 브라우저 최단 완료 · ${best.completedDay}일차` : "";
+  $("ending-best").textContent = best ? `이 브라우저 최단 완료 · ${best.timeMode ? formatMetric(best.deliveryMinute, "시각") : best.completedDay + "일차"}` : "";
 }
 
 function endRun() {
@@ -1145,7 +1245,9 @@ function endRun() {
   const version = ++syncVersion;
   if (!debug) {
     const best = loadLocal(BEST_KEY);
-    if (record.completedDay && (!best || record.completedDay < best.completedDay)) saveLocal(BEST_KEY, record);
+    if (record.timeMode !== "완화" && record.completedDay &&
+        (!best || (record.timeMode ? best.deliveryMinute == null || record.deliveryMinute < best.deliveryMinute :
+          !best.timeMode && record.completedDay < best.completedDay))) saveLocal(BEST_KEY, record);
     syncRecord(record, { ruleset: state.ruleset, id: state.id, seed: state.seed, moves: state.moves }).then((message) => {
       if (version === syncVersion) $("ending-sync").textContent = message;
     });
@@ -1174,6 +1276,7 @@ function endRun() {
 }
 
 function title() {
+  taskTimer.flush();
   clearTimeout(idle);
   stopWorker({ unavailable: true });
   bossVersion++;
@@ -1185,7 +1288,7 @@ function title() {
   } catch { /* A restricted browser can still play the intro. */ }
   const best = loadLocal(BEST_KEY);
   const legacy = loadLocal("retro-best");
-  $("title-best").textContent = best ? `이 브라우저 최단 완료 · ${best.completedDay}일차`
+  $("title-best").textContent = best ? `이 브라우저 최단 완료 · ${best.timeMode ? formatMetric(best.deliveryMinute, "시각") : best.completedDay + "일차"}`
     : legacy ? `이전 10일판 최고 기록 · ${legacy.score}점 · ${legacy.ending}` : "";
 }
 
@@ -1232,6 +1335,7 @@ officeGuide.onclose = () => {
 };
 $("office-clock").onclick = () => {
   peekAtClock();
+  if (state.phase === "sunday") return;
   const naming = isTutorial(state) && state.phase === "arrive";
   bossSay(naming ? "벌써 시계부터 봐? 출근은 했으니까, 신입 이름부터 알려 줘." : CLOCK_REPLIES[clockChecks++ % CLOCK_REPLIES.length]);
   resetIdle();
@@ -1246,6 +1350,7 @@ if (LOCAL_DEBUG) {
     const button = $(id);
     button.classList.remove("hidden");
     button.onclick = () => {
+      taskTimer.flush();
       if (busy || !passWorkForDebug(state)) return;
       draft = null;
       workDraft = null;
@@ -1255,14 +1360,18 @@ if (LOCAL_DEBUG) {
   }
 }
 $("mission-review-code").onclick = () => {
+  taskTimer.flush();
   if (busy || !requestCodeReview(state)) return;
+  if (state.ending) return endRun();
   hud();
   renderChoices();
   renderCoding();
   checkpoint();
 };
 $("mission-delegate").onclick = () => {
+  taskTimer.flush();
   if (busy || !delegateCodeWork(state)) return;
+  if (state.ending) return endRun();
   coworkerHelp.hidePopover();
   draft = null;
   renderOffice(true);

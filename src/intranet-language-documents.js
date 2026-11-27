@@ -28,12 +28,12 @@ const notes = {
       'int points = 15;\nif (points >= 10) {\n    points = points - 10;\n}'],
     ["arrays", "cafe", "vector의 크기와 칸 번호", ["배열", "2차원 배열", "반복문", "재고 관리"],
       ["vector", "size", "push_back", "loop", "for", "while", "index", "array"],
-      "배열처럼 []로 원소를 읽고 size()로 길이를 구합니다. 첫 칸은 0입니다. 값만 순회하려면 범위 기반 for문으로 간단히 읽을 수 있습니다.",
-      '#include <vector>\nstd::vector<int> sizes = {2, 6, 4};\nfor (int value : sizes) {\n    // value를 사용하세요.\n}'],
+      "배열처럼 []로 원소를 읽고 size()로 길이를 구합니다. 첫 칸은 0입니다. 인덱스로 순회할 때는 i < sizes.size()를 조건으로 씁니다.",
+      '#include <vector>\nint raw[] = {2, 6, 4};\nstd::vector<int> sizes(raw, raw + 3);\nfor (std::size_t i = 0; i < sizes.size(); ++i) {\n    // sizes[i]를 사용하세요.\n}'],
     ["lookups", "blog", "표준 라이브러리로 목록 정리하기", ["정렬", "정렬된 배열", "탐색", "이진 탐색", "딕셔너리", "집합", "자료구조", "기초 알고리즘"],
       ["sort", "search", "map", "set", "find", "lower_bound", "binary search"],
       "sort는 begin()부터 end() 앞까지 정렬합니다. 키별로 값을 보려면 map, 이미 나온 값만 기록하려면 set이 편합니다.",
-      '#include <algorithm>\n#include <vector>\nstd::vector<int> pages = {7, 2, 9};\nstd::sort(pages.begin(), pages.end());'],
+      '#include <algorithm>\n#include <vector>\nint pages[] = {7, 2, 9};\nstd::sort(pages, pages + 3);'],
   ],
 };
 

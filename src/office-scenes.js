@@ -1,3 +1,4 @@
+import { hasSurvival } from "./survival.js";
 import { ARCHITECTURE, AUTOMATION, CODE_REVIEW, DEPARTMENTS, LUNCH } from "./office-content.js";
 
 export const CAST_NAMES = {
@@ -89,11 +90,22 @@ const FRIDAY_REPLIES = {
   joke: ["lee", "…아, 웃으면 안 되는 거였죠?"],
 };
 
+const SURVIVAL_SCENES = {
+  3: [["park", "신입, 예상 시간 30분짜리 봤어? 내가 맡았으니까 찾지 마."]],
+  6: [["boss", "오늘 토요일이니까 오전만 하고 가자. 중국집 전화번호는 누가 갖고 있어?"]],
+  8: [["park", "이 대리 병가래. 그 사람이 쓴 검수표는 출근했더라."]],
+  9: [["jung", "오늘부터 코드 동결이야."], ["jung", "아, 주문 쪽 구조는 오늘 안에 갈아엎고."]],
+  10: [["qa", "검수 실패한 항목만 보냈어요. 첨부파일이 세 개예요."]],
+  11: [["boss", "오늘 회의 다 취소했어. 회의 없이 어떻게 납품할지 10분 뒤에 회의하자."]],
+  12: [["boss", "오늘 납품이야, 신입. 검수 통과한 파일에만 진짜 최종이라고 적어."]],
+};
+
 export function officeScene(state, friday) {
+  if (state.phase === "sunday") return null;
   const previous = state.moves.at(-1);
   if (previous === "code-delegate") return [["lee", "이 건은 제가 넘겨받아서 끝냈어요. 다음에 막히는 데가 있으면 미리 얘기해 줘요."]];
   switch (state.phase) {
-    case "arrive": return ARRIVAL_SCENES[state.event.title];
+    case "arrive": return hasSurvival(state) && SURVIVAL_SCENES[state.shift] || ARRIVAL_SCENES[state.event.title];
     case "scrum": return SCRUM_SCENES[state.scrum.event?.id];
     case "lunch": return [LUNCH[(state.shift - 1) % LUNCH.length]];
     case "negotiate": return [LUNCH_REPLIES[previous], [state.department, state.request[1]]].filter(Boolean);

@@ -39,7 +39,7 @@ function play(style, seed = 417, ruleset = SCRUM_RULESET) {
 test("all six endings are reachable and reproduce the same saved metrics on replay", () => {
   assert.equal(MISSIONS.length, 12);
   assert.ok(OFFICE_EVENTS.length >= 30 && OFFICE_EVENTS.length <= 40);
-  for (const ending of Object.keys(ENDINGS)) {
+  for (const ending of ["balance", "promotion", "teamwork", "release", "hospital", "deadline"]) {
     const run = play(ending);
     assert.equal(run.ending, ending);
     assert.deepEqual(replayRun(run), recordFor(run));

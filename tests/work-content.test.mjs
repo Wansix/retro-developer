@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DEBUG_PASS_MOVE, act, canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, isHalfDay, missionCount, missionNotice, newRun, officeTime, options, passWorkForDebug, playMinesAction, projectDay, recordFor, replayRun, requestCodeReview, submitSolution, submitSpecialWork } from "../src/office.js";
+import { DEBUG_PASS_MOVE, act, canSubmit, codingCost, currentMission, deferWork, delegateCodeWork, enableRelaxed, failCodeSubmission, isHalfDay, missionCount, missionNotice, newRun, officeTime, options, passWorkForDebug, playMinesAction, projectDay, recordFor, recordPaste, recordTaskTime, replayRun, searchAtWork, requestCodeReview, submitSolution, submitSpecialWork, useBurst } from "../src/office.js";
 import { MINE_BREAK_COST, MINE_WARNING_SECONDS, mineNeighbors } from "../src/mines.js";
 import { gradeWork, makeWork, WORK_TYPES, workOrder } from "../src/work-missions.js";
-import { formatDate, LANGUAGE_ASSIGNMENT_RULESET, OFFICE_CLOCK_RULESET, PROBLEM_BANK_RULESET, SHORT_PROJECT_RULESET, WORK_CONTENT_RULESET } from "../src/records-schema.js";
-import { PROJECT_GOAL, projectReady } from "../src/project-work.js";
+import { SATURDAY_SHIFT_RULESET, formatDate, LANGUAGE_ASSIGNMENT_RULESET, OFFICE_CLOCK_RULESET, PROBLEM_BANK_RULESET, SHORT_PROJECT_RULESET, WORK_CONTENT_RULESET } from "../src/records-schema.js";
+import { DEPLOYMENT_WORK, PROJECT_GOAL, nextProjectWork, projectReady } from "../src/project-work.js";
+import { stressPenalty, SURVIVAL } from "../src/survival.js";
 import { LANGUAGES, assignedLanguage } from "../src/office-languages.js";
 
 function sudokuSolutions(work) {
@@ -278,7 +279,7 @@ test("first-day language assignment excludes the chosen language and persists th
   for (let seed = 0; seed < 40; seed++) {
     unknownRolls.add(assignedLanguage(seed, "none"));
     for (const familiar of all) {
-      const run = newRun(seed);
+      const run = newRun(seed, undefined, SATURDAY_SHIFT_RULESET);
       assert.ok(!act(run, "arrive"));
       step(run, "stack-" + familiar);
       assert.equal(run.phase, "arrive");
@@ -292,7 +293,7 @@ test("first-day language assignment excludes the chosen language and persists th
     }
   }
   assert.equal(unknownRolls.size, all.length);
-  const run = newRun(512);
+  const run = newRun(512, undefined, SATURDAY_SHIFT_RULESET);
   step(run, "stack-javascript", "arrive");
   advance(run, true);
   assert.equal(recordFor(run).language, run.language);
@@ -322,7 +323,7 @@ test("the 10-day project releases every template without duplicates and requires
 test("the new curriculum uses six one-line grammar exercises through shift three and replays a complete run", () => {
   const choices = new Set();
   for (const seed of [12, 417, 91231, 24, 28, 83]) {
-    const run = newRun(seed);
+    const run = newRun(seed, undefined, SATURDAY_SHIFT_RULESET);
     const firstDays = run.workOrder.filter(({ day }) => day < 4);
     assert.equal(new Set(run.workOrder.map(job => job.key)).size, 28);
     for (const language of Object.keys(LANGUAGES)) {
@@ -346,7 +347,7 @@ test("the new curriculum uses six one-line grammar exercises through shift three
 });
 
 test("debug completion consumes the normal time and cannot be replayed for ranking", () => {
-  const run = newRun(417);
+  const run = newRun(417, undefined, SATURDAY_SHIFT_RULESET);
   assert.equal(passWorkForDebug(run), false);
   step(run, "stack-none", "arrive");
   const expectedTime = run.remaining - codingCost(run);
@@ -361,7 +362,7 @@ test("debug completion consumes the normal time and cannot be replayed for ranki
 });
 
 test("the first shift uses the full schedule and only unlocks the afternoon assignment after lunch", () => {
-  const run = newRun(417);
+  const run = newRun(417, undefined, SATURDAY_SHIFT_RULESET);
   assert.equal(officeTime(run), "09:00");
   step(run, "stack-none", "arrive");
   assert.equal(officeTime(run), "10:00");
@@ -394,7 +395,7 @@ test("the first shift uses the full schedule and only unlocks the afternoon assi
 });
 
 test("unsubmitted work carries over the lunch break and Friday reserves enough time for the project meeting", () => {
-  const run = newRun(417);
+  const run = newRun(417, undefined, SATURDAY_SHIFT_RULESET);
   step(run, "stack-none", "arrive");
   const id = currentMission(run).id;
   assert.equal(failCodeSubmission(run), 5);
@@ -409,7 +410,7 @@ test("unsubmitted work carries over the lunch break and Friday reserves enough t
 });
 
 test("new runs count Saturday mornings and skip Sunday while older saves keep their calendar", () => {
-  const run = newRun(417);
+  const run = newRun(417, undefined, SATURDAY_SHIFT_RULESET);
   assert.equal(run.deadline, 11);
   assert.equal(projectDay(run, run.deadline), 10);
   assert.equal(formatDate(run.deadline), "3월 16일 목");
@@ -434,4 +435,207 @@ test("new runs count Saturday mornings and skip Sunday while older saves keep th
   advance(previous, false, state => state.shift === 6);
   assert.equal(previous.day, 8);
   assert.equal(previous.deadline, 12);
+});
+
+function survivalAdvance(run, until, style = "no-overtime") {
+  let weekend = false;
+  for (let i = 0; i < 450 && !run.ending && !until(run); i++) {
+    if (run.phase === "sunday") {
+      weekend = true;
+      step(run, style === "relationship" ? "sunday-lee" : "sunday-rest");
+      continue;
+    }
+    const available = options(run).filter(item => !item.disabled);
+    assert.ok(available.length > 0 && available.length <= 4);
+    const has = id => available.some(item => item.id === id);
+    if (canSubmit(run)) {
+      if (style === "overtime" && run.shift === 6 && run.phase === "morning") {
+        step(run, "next");
+        continue;
+      }
+      const mission = currentMission(run);
+      const elapsed = style === "paced" ? .82 : .36;
+      if (!run.task.elapsed) assert.ok(recordTaskTime(run, Math.round(run.task.limit * elapsed)));
+      if (!canSubmit(run)) {
+        step(run, "next");
+        continue;
+      }
+      if (mission.type === "code") assert.ok(submitSolution(run));
+      else assert.equal(submitSpecialWork(run, solution(mission)).passed, true);
+      continue;
+    }
+    const move = [
+      ...(style === "overtime" ? ["saturday-meal"] : []),
+      ...(style === "reckless" ? ["accept", "yes", "nextWork", "promise-standard", "next"] : []),
+      ...(style === "relationship" ? ["help", "scope-agreement", "ally"] : []),
+      "scope-agreement", "cleanup", "nextWork", "promise-standard", "receiveWork",
+      "arrive", "scrumQuick", "scrumHonest", "rest", "document", "trim", "reportBrief", "leave", "next",
+    ].find(has);
+    step(run, move ?? available[0].id);
+  }
+  assert.ok(until(run));
+  return weekend;
+}
+
+test("two-week strategies finish the same Saturday with distinct health, meetings, and overtime", () => {
+  const endings = {};
+  for (const style of ["no-overtime", "overtime", "relationship", "paced"]) {
+    for (const seed of [15, 417, 1138, 72531]) {
+      const run = newRun(seed);
+      assert.equal(run.deadline, 13);
+      assert.equal(projectDay(run, run.deadline), 12);
+      assert.equal(nextProjectWork({ ...run, progress: 15, shift: 11 }), null);
+      assert.equal(survivalAdvance(run, state => state.ending, style), true);
+      assert.ok(run.hp > 0);
+      assert.equal(run.progress, 16);
+      assert.equal(run.scope, 0);
+      assert.equal(run.completedDay, 13);
+      assert.equal(recordFor(run).completedDay, 12);
+      assert.equal(recordFor(run).scoreGoal, undefined);
+      assert.deepEqual(replayRun(run), recordFor(run));
+      if (style === "overtime") {
+        assert.ok(run.stats.overtimeMinutes > 0);
+        assert.equal(run.stats.saturdayLeaves, 1);
+        assert.ok(run.achievements.includes("반나절의 기적"));
+      } else {
+        assert.equal(run.stats.overtimeMinutes, 0);
+        assert.equal(run.stats.saturdayLeaves, 2);
+      }
+      if (style === "relationship") assert.ok(run.memory.helpedLee >= 2);
+      endings[style] = run.ending;
+    }
+  }
+  assert.ok(Object.values(endings).every(id => id !== "hospital" && id !== "deadline"));
+  const reckless = newRun(417);
+  survivalAdvance(reckless, state => state.ending, "reckless");
+  assert.ok(reckless.stats.fastJobs >= 10);
+  assert.ok(reckless.scope > 0);
+  assert.equal(reckless.ending, "deadline");
+});
+
+test("the timer accounts for elapsed time once, restores from JSON, and permits late delivery and deferral", () => {
+  const run = newRun(417);
+  step(run, "stack-none", "arrive");
+  assert.equal(canSubmit(run), false);
+  step(run, "promise-standard");
+  assert.equal(recordTaskTime(run, -1), false);
+  const budget = run.remaining;
+  assert.ok(recordTaskTime(run, run.task.limit));
+  assert.ok(searchAtWork(run));
+  const trust = run.stats.reportTrust;
+  assert.ok(recordTaskTime(run, 1, true));
+  assert.ok(recordTaskTime(run, 1));
+  assert.equal(run.stats.timeouts, 1);
+  assert.equal(run.stats.reportTrust, trust - 5);
+  assert.equal(run.stats.actualCodingSeconds, run.task.limit + 1);
+  assert.equal(recordPaste(run), 1);
+  const restored = JSON.parse(JSON.stringify(run));
+  assert.deepEqual(restored.task, run.task);
+  assert.equal(restored.remaining, budget - 3);
+  assert.ok(canSubmit(restored));
+  const retry = failCodeSubmission(restored);
+  assert.ok(retry >= 5);
+  assert.ok(recordTaskTime(restored, 2));
+  const charge = codingCost(restored);
+  assert.ok(retry + charge < codingCost(run) + 30);
+  assert.ok(submitSolution(restored));
+  assert.equal(submitSolution(restored), false);
+  assert.equal(restored.remaining, budget - 3 - retry - charge);
+  assert.equal(restored.stats.timeouts, 1);
+  assert.equal(restored.stats.fastJobs, 0);
+  assert.ok(deferWork(run));
+  assert.equal(recordTaskTime(run, 10), false);
+  assert.equal(currentMission(run).id, currentMission(newRun(417)).id);
+  assert.ok(run.solvedToday);
+
+  const relaxed = newRun(417);
+  assert.ok(enableRelaxed(relaxed));
+  assert.equal(enableRelaxed(relaxed), false);
+  step(relaxed, "stack-none", "arrive", "promise-standard");
+  assert.equal(relaxed.task.limit, run.stats.actualCodingSeconds * 2 - 2);
+  survivalAdvance(relaxed, state => state.ending);
+  assert.equal(replayRun(relaxed).timeMode, "완화");
+});
+
+test("Sunday recovery, stress thresholds and low reputation are independent of the delivery gate", () => {
+  assert.deepEqual([0, 59, 60, 74, 75, 89, 90, 100].map(stressPenalty), [0, 0, 5, 5, 10, 10, 20, 20]);
+  const run = newRun(417);
+  survivalAdvance(run, state => state.phase === "sunday");
+  run.hp = 42;
+  run.stress = 80;
+  step(run, "sunday-rest");
+  assert.equal(run.day, 8);
+  assert.equal(run.shift, 7);
+  assert.equal(run.hp, 82);
+  assert.equal(run.stress, 50);
+  survivalAdvance(run, state => state.shift === 12 && canSubmit(state));
+  assert.equal(currentMission(run).id, makeWork(DEPLOYMENT_WORK, run.seed, run.language).id);
+  run.score = -100;
+  assert.ok(submitSolution(run));
+  assert.ok(projectReady(run));
+  step(run, "next", "leave");
+  assert.ok(run.completedDay);
+});
+
+test("burst is one use, spans two game hours, and settles once including a successful delivery at zero HP", () => {
+  const run = newRun(417);
+  assert.equal(useBurst(run), false);
+  survivalAdvance(run, state => state.shift === 11 && state.phase === "morning" && !!state.task);
+  const baseLimit = run.task.limit;
+  const normal = codingCost(run);
+  const hp = run.hp;
+  assert.ok(useBurst(run));
+  assert.equal(useBurst(run), false);
+  assert.equal(run.task.limit + run.task.burstBonus, baseLimit * 2);
+  assert.equal(codingCost(run), Math.ceil(normal / 2));
+  const cost = codingCost(run);
+  assert.ok(submitSolution(run));
+  const afterWork = run.hp;
+  assert.ok(afterWork <= hp);
+  assert.equal(run.burst.remaining, SURVIVAL.burst.minutes - cost);
+  step(run, "next");
+  assert.equal(run.burst.remaining, 0);
+  assert.equal(run.hp, afterWork - 36);
+  step(run, "rest");
+  assert.equal(run.hp, afterWork - 36 + 10);
+  survivalAdvance(run, state => state.ending);
+  assert.deepEqual(replayRun(run), recordFor(run));
+
+  const last = newRun(417);
+  survivalAdvance(last, state => state.shift === 12 && canSubmit(state));
+  assert.ok(useBurst(last));
+  const finalMission = currentMission(last);
+  last.hp = Math.max(0, -(finalMission.reward?.hp ?? -3)) + Math.ceil(codingCost(last) * .3);
+  assert.ok(submitSolution(last));
+  assert.equal(last.hp, 0);
+  assert.equal(last.ending, "burstHospital");
+  assert.equal(recordFor(last).projectDelivered, true);
+  assert.equal(last.completedDay, null);
+  assert.equal(useBurst(last), false);
+});
+
+test("decisions carried from first week create handoff costs and a documented customer extension", () => {
+  const run = newRun(417);
+  survivalAdvance(run, state => state.shift === 4 && state.phase === "negotiate");
+  step(run, "accept");
+  assert.equal(run.memory.planningAccepted, 1);
+  survivalAdvance(run, state => state.shift === 7 && state.phase === "arrive");
+  const scope = run.scope;
+  step(run, "arrive");
+  assert.ok(run.scope > scope);
+  assert.match(run.effects.join(" "), /지난주/);
+
+  survivalAdvance(run, state => state.shift === 11 && state.phase === "negotiate");
+  run.stats.reportTrust = 90;
+  step(run, "push");
+  assert.equal(run.memory.clientExtension, true);
+  assert.match(run.effects.join(" "), /한 시간/);
+  survivalAdvance(run, state => state.shift === 12 && state.phase === "morning" && !!state.task);
+  step(run, "next", "stay");
+  assert.equal(officeTime(run), "12:00");
+  assert.equal(run.remaining, SURVIVAL.overtime.saturday + SURVIVAL.overtime.clientExtension);
+  const hp = run.hp;
+  step(run, "coffee");
+  assert.equal(run.stats.overtimeMinutes, 15);
+  assert.ok(run.hp <= hp + 5 - 2);
 });

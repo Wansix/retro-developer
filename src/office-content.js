@@ -120,6 +120,10 @@ export const OFFICE_EVENTS = [
 ].map(([title, text, effect]) => ({ title, text, effect }));
 
 export const ENDINGS = {
+  politics: { title: "회의록으로 살아남은 개발자", text: "요구사항 일곱 줄을 지웠다. 전원 합의했다는 메일은 열일곱 통이었다.", cleared: true },
+  leisure: { title: "월급루팡의 귀환", text: "프로젝트를 배포했다. 인수인계 폴더에 지뢰찾기 최고 기록도 남겼다.", cleared: true },
+  comeback: { title: "마감 역전", text: "마지막 순간에 배포가 끝났다. 김 과장은 이 속도로 다음 프로젝트 일정을 계산하기 시작했다.", cleared: true },
+  burstHospital: { title: "납기는 지켰습니다", text: "프로젝트 성공. 고객사 만족. 회사 흑자. 개발자 입원. 김 과장 ‘신입, 다음 프로젝트도 같이하자.’", cleared: false },
   balance: { title: "제때 퇴근한 개발자", text: "마감과 퇴근 시간을 모두 지켰다. 박 대리가 조용히 시계를 맞췄다.", cleared: true },
   promotion: { title: "차기 김 과장", text: "정 부장이 과장 자리를 제안했다. 김 과장이 먼저 퇴근해도 되냐고 물었다.", cleared: true },
   teamwork: { title: "같이 만든 사람들", text: "부서마다 한 사람씩 검수 메일에 답장했다. 전원 수신 확인은 이번이 처음이었다.", cleared: true },

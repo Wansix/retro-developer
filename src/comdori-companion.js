@@ -16,7 +16,7 @@ const LESSON_TARGETS = {
   deadline: ".hud-item:has(> #hud-dday), #office-guide-open",
 };
 
-export function mountOfficeCompanion({ getState, getShift, paused, onChange, onLessonNext }) {
+export function mountOfficeCompanion({ getState, getShift, survival, paused, onChange, onLessonNext }) {
   const panel = document.getElementById("compdori-panel");
   const corner = panel.parentElement;
   const lesson = document.getElementById("office-lesson");
@@ -125,6 +125,13 @@ export function mountOfficeCompanion({ getState, getShift, paused, onChange, onL
     return true;
   }
 
+  const survivalLessons = {
+    time: "위는 남은 근무 시간입니다. 약속 타이머는 코드를 쓰거나 검색할 때 흐르고, 제출하면 업무 시간이 차감돼요.",
+    score: "업무가 끝나서 완료 건수와 평판이 올랐어요. 평판이 높으면 일을 더 가져올 수도 있습니다.",
+    stress: "스트레스가 60, 75, 90을 넘으면 업무 시간이 더 듭니다. 커피나 지뢰찾기에도 시간이 들어요.",
+    deadline: "두 번째 토요일이 최종 납품입니다. 필수 업무와 추가 일감을 끝내고 배포 검수를 통과하세요.",
+  };
+
   function teach(topic) {
     if (!timer) return;
     if (!topic) {
@@ -145,7 +152,7 @@ export function mountOfficeCompanion({ getState, getShift, paused, onChange, onL
     highlight(topic);
     state.seen.push(id);
     state.pending = state.pending.filter(({ event }) => !["coding", "idle", "success"].includes(event));
-    state.last = { id, event: id, text: TUTORIAL_LINES[topic], at: Date.now() };
+    state.last = { id, event: id, text: (survival() && survivalLessons[topic]) || TUTORIAL_LINES[topic], at: Date.now() };
     typing?.abort();
     say(state.last);
   }

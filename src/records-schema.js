@@ -1,3 +1,5 @@
+import { SURVIVAL_RULESET } from "./survival.js";
+
 export const TOTAL_DAYS = 30;
 export const FIRST_RULESET = 1;
 export const SCRUM_RULESET = 2;
@@ -11,7 +13,7 @@ export const FUNDAMENTALS_RULESET = 9;
 export const OFFICE_CLOCK_RULESET = 10;
 export const SATURDAY_SHIFT_RULESET = 11;
 export const PROJECT_WORKDAYS = 10;
-export const RULESET = SATURDAY_SHIFT_RULESET;
+export const RULESET = SURVIVAL_RULESET;
 
 export const calendarDayForWorkday = (day, daysPerWeek = 5) => day + (7 - daysPerWeek) * Math.floor((day - 1) / daysPerWeek);
 export const workdayForCalendarDay = (day, daysPerWeek = 5) => day - (7 - daysPerWeek) * Math.floor((day - 1) / 7);
@@ -25,6 +27,24 @@ export const SCRUM_METRICS = [
 ];
 
 export const METRICS = [
+  ["webSearches", "미래넷 자료 목록을 연 업무", "건"],
+  ["webBlogs", "블로그 열람", "회"],
+  ["webBoards", "게시판 열람", "회"],
+  ["webManuals", "공식 문서 열람", "회"],
+  ["webLectures", "동영상 강의 재생", "회"],
+  ["webMinutes", "미래넷에 사용한 업무 시간", "분"],
+  ["webAssisted", "관련 자료 열람 후 완료한 업무", "건"],
+  ["actualCodingSeconds", "실제 코딩 시간", "초"],
+  ["timeouts", "업무 제한 시간 초과", "회"],
+  ["fastJobs", "빠른 업무 완료", "건"],
+  ["negotiations", "협상 성공", "회"],
+  ["saturdayLeaves", "토요일 오전 퇴근", "회"],
+  ["overtimeMinutes", "실제 사용한 야근 시간", "분"],
+  ["burstUsed", "버스트 모드", ""],
+  ["burstSaved", "버스트로 절약한 시간", "분"],
+  ["reputation", "최종 사내 평판", "점"],
+  ["timeMode", "업무 타이머 모드", ""],
+  ["deliveryMinute", "최종 납품 시각", "시각"],
   ["coding", "실제 코딩 시간", "분"],
   ["meetings", "전체 회의 시간", "분"],
   ...SCRUM_METRICS,
@@ -49,7 +69,11 @@ export const METRICS = [
 ];
 
 export const CATEGORIES = {
-  fastest: { label: "최단 프로젝트 완료", key: "completedDay", order: "ASC", unit: "일차", clears: true },
+  fastest: { label: "가장 이른 최종 납품 · 2주판", key: "deliveryMinute", order: "ASC", unit: "시각", clears: true, mode: "survival" },
+  classicFastest: { label: "최단 프로젝트 완료 · 구버전", key: "completedDay", order: "ASC", unit: "일차", clears: true, mode: "legacy" },
+  fastJobs: { label: "최다 빠른 업무 완료 · 2주판", key: "fastJobs", order: "DESC", unit: "건" },
+  negotiations: { label: "최다 협상 성공 · 2주판", key: "negotiations", order: "DESC", unit: "회" },
+  burstSaved: { label: "버스트 최다 절약 · 2주판", key: "burstSaved", order: "DESC", unit: "분" },
   leastOvertime: { label: "최소 야근", key: "overtime", order: "ASC", unit: "회", clears: true },
   health: { label: "최고 잔여 체력", key: "hp", order: "DESC", unit: "", clears: true },
   onTime: { label: "최다 정시 퇴근", key: "onTime", order: "DESC", unit: "회" },
@@ -67,4 +91,19 @@ export function formatMinutes(minutes) {
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
   return remainder ? `${hours}시간 ${remainder}분` : `${hours}시간`;
+}
+
+export function formatSeconds(seconds) {
+  return String(Math.floor(seconds / 60)).padStart(2, "0") + ":" + String(seconds % 60).padStart(2, "0");
+}
+
+export function formatMetric(value, unit) {
+  if (unit === "분") return formatMinutes(value);
+  if (unit === "초") return formatSeconds(value);
+  if (unit === "시각") return value === null ? "미완료" : formatSeconds(value);
+  return `${value}${unit}`;
+}
+
+export function internetRecordRows(record) {
+  return (record.webSources ?? []).map(({ title, count }) => [`미래넷 · ${title}`, `${count}회`]);
 }

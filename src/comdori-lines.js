@@ -14,6 +14,14 @@ export const TUTORIAL_LINES = {
 };
 
 export const COMDORI_LINES = {
+  burst: {
+    priority: 5, cooldown: 0,
+    lines: ["인간의 마감 직전 연산 능력이 급격히 상승했습니다."],
+  },
+  sunday: {
+    priority: 3, cooldown: 0,
+    lines: ["오늘은 호출기를 꺼도 됩니다. 월요일에 다시 켜면 됩니다."],
+  },
   lateLocal: {
     priority: 2,
     cooldown: 90000,
@@ -137,7 +145,15 @@ export const COMDORI_LINES = {
   },
   "web-first": {
     priority: 4,
-    lines: ["2006년엔 막히면 직접 검색했습니다. 검색어 고르는 것도 개발 실력이었습니다."],
+    lines: ["당시에는 구글링도 개발자의 중요한 덕목이었습니다."],
+  },
+  "web-lecture": {
+    priority: 4,
+    lines: ["2026년에는 제가 이 모든 정보를 종합해서 답변해 드렸습니다."],
+  },
+  "web-lecture-done": {
+    priority: 5,
+    lines: ["언어의 장벽을 프로그래밍 언어로 극복하셨습니다."],
   },
   "web-stack": {
     priority: 4,

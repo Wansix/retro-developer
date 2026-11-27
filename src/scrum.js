@@ -1,3 +1,4 @@
+import { hasSurvival, SURVIVAL } from "./survival.js";
 import { CHAINED_WORK_RULESET, DIRECT_ASSIGNMENT_RULESET, WORK_CONTENT_RULESET, formatMinutes } from "./records-schema.js";
 
 const EVENTS = [
@@ -88,6 +89,12 @@ export function handleScrum(s, id, missionName) {
   const effect = {};
   const report = { day: s.day, kind: id, minutes: 15 + (event?.minutes ?? 0) };
   const effects = [];
+  if (hasSurvival(s) && s.stats.reportTrust <= SURVIVAL.meetingTrust.low) {
+    report.minutes += 15;
+    effects.push("김 과장이 진행표를 대조했다. 추가 확인 15분.");
+  } else if (hasSurvival(s) && s.stats.reportTrust >= SURVIVAL.meetingTrust.high && event?.id !== "caught") {
+    report.minutes -= Math.min(event?.minutes ?? 0, 15);
+  }
   if (event) effects.push(event.text);
   switch (id) {
     case "scrumQuick":

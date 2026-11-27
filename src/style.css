@@ -1321,21 +1321,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 #desk-internet button:not(:disabled):active { border-style: inset; }
 #desk-internet :focus-visible { outline: 2px solid #214f93; outline-offset: -2px; }
 #internet-close { font-size: 1rem; min-width: 1.6rem; line-height: 1; }
-.internet-toolbar, #internet-search {
+.internet-toolbar {
   display: flex;
   align-items: center;
   gap: .25rem;
   padding: .23rem .32rem;
   border-bottom: 1px solid #9ca79a;
-}
-#internet-query {
-  flex: 1;
-  min-width: 0;
-  min-height: 28px;
-  padding: .1rem .25rem;
-  background: #f9fcf8;
-  border: 2px inset #d0d9ca;
-  color: #202624;
 }
 #internet-location {
   padding: .18rem .4rem;
@@ -1481,7 +1472,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   }
   #boss-face, #coworker-face { left: 53%; }
   #office-title { margin-left: 0; }
-  #editor, .editor-highlight, #player-name, #internet-query { font-size: 1rem; }
+  #editor, .editor-highlight, #player-name { font-size: 1rem; }
   .terminal { padding: clamp(1rem, 5vw, 2rem); }
 }
 @media (max-height: 430px) {
@@ -1592,3 +1583,39 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 @media (prefers-reduced-motion: reduce) {
   *, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+.timer-setting { display: flex; align-items: center; gap: .5rem; font-size: .88rem; }
+#task-tools { display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: .25rem .5rem; font-size: .8rem; }
+#task-tools .act-btn { padding: .18rem .45rem; min-height: 30px; font-size: .8rem; }
+#task-clock { padding: .24rem .5rem; border: 1px solid currentColor; font-variant-numeric: tabular-nums; }
+#task-clock[data-urgency="soon"] { color: #5d3a00; background: #ffe6a4; }
+#task-clock[data-urgency="exceeded"] { color: #651c20; background: #ffd4ce; }
+#burst-launch { color: #fff6ed; background: #8a3328; letter-spacing: .03em; }
+#burst-status { color: #651c20; font-weight: bold; }
+#screen-office.deadline-office #scene-caption { color: #ffdeb0; }
+#screen-office.deadline-office #office-scene { border-color: #965538; }
+#screen-office.burst-effects.burst-active #work-panel { box-shadow: inset 0 0 0 2px #b7422c; }
+#screen-office.burst-effects.burst-crash #work-panel { animation: burst-recovery .7s ease-out; }
+@keyframes burst-recovery { from { filter: saturate(.45); } to { filter: saturate(1); } }
+@media (prefers-reduced-motion: reduce) { #screen-office.burst-effects.burst-crash #work-panel { animation: none; } }
+
+#hud-time-item { position: relative; }
+#internet-time-loss { position: absolute; inset: 0 .15rem auto auto; opacity: 0; color: #ffcf84; font-weight: bold; pointer-events: none; }
+#internet-notice, #internet-open-status { color: #682b24; padding: .18rem .4rem; font-size: .78rem; }
+#internet-notice:empty, #internet-open-status:empty { display: none; }
+#internet-open-status { grid-column: 1 / -1; align-self: start; margin: 0; background: #ffe9c9; }
+#internet-notice { background: #f9eac3; }
+.internet-results .internet-meta { margin: .12rem 0 0; }
+.internet-reaction { background: #fff5c5; border-left: 3px solid #9a7533; padding: .45rem; }
+.internet-article[data-site="lecture"] .internet-site { background: #d1d8e5; color: #263a5a; }
+.internet-lecture { color: #f6f5eb; background: #303344; padding: .4rem; border: 3px ridge #a7afba; }
+.lecture-stage { display: grid; grid-template-columns: minmax(38px, 67px) minmax(0, 1fr); align-items: end; gap: .25rem; background: #203f35; }
+.lecture-avatar { width: 100%; image-rendering: pixelated; }
+.lecture-chalk { align-self: stretch; min-width: 0; color: #fdf1cb; padding: .28rem .35rem; font-size: .77rem; }
+.lecture-chalk p { margin: 0; }
+.internet-entry .lecture-chalk pre { margin: .25rem 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #fdf1cb; background: transparent; border: 0; font-size: .72rem; padding: 0; }
+.lecture-caption { margin: .38rem 0; min-height: 2.5em; font: .84rem/1.3 Arial, sans-serif; }
+.lecture-controls { display: flex; flex-wrap: wrap; gap: .24rem; }
+.lecture-controls button { min-height: 28px; }
+.internet-lecture progress { vertical-align: middle; width: 56%; margin: 0 .3rem .4rem 0; accent-color: #8fbfb7; }
+.lecture-duration { font-variant-numeric: tabular-nums; font-size: .75rem; }
