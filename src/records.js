@@ -1,3 +1,4 @@
+import { isPlayMode, playMode } from "./play-mode.js";
 import { ENDINGS } from "./office-content.js";
 import { CATEGORIES, METRICS, formatDate, formatMetric, internetRecordRows } from "./records-schema.js";
 import { workResultRows } from "./work-missions.js";
@@ -13,6 +14,8 @@ let page = 0;
 let generation = 0;
 let rankGeneration = 0;
 let busy = false;
+let runStorage;
+let rankMode = "real_coding";
 
 function localRecord() {
   try { return JSON.parse(localStorage.getItem(LAST_KEY)); } catch { return null; }
@@ -22,9 +25,10 @@ function keepRecord(record, proof, owner, saved = false) {
   try { localStorage.setItem(LAST_KEY, JSON.stringify({ record, proof, owner, saved })); } catch { /* In-memory play still works. */ }
 }
 
-async function api(view, { body, category, history } = {}) {
+async function api(view, { body, category, history, mode } = {}) {
   const query = new URLSearchParams({ view });
   if (category) query.set("category", category);
+  if (mode) query.set("mode", mode);
   if (history) query.set("page", history);
   const res = await fetch(`/api/records?${query}`, {
     ...(body === undefined ? {} : {
@@ -69,6 +73,8 @@ function renderAccount() {
   $("logout").classList.toggle("hidden", !account);
   $("save-record").classList.toggle("hidden", !account || !last?.proof || (last.owner && last.owner !== account) || last.saved === true);
   $("history-panel").classList.toggle("hidden", !account);
+  $("save-checkpoint").classList.toggle("hidden", !account || !runStorage.get()?.state);
+  $("load-checkpoint").classList.toggle("hidden", !account);
 }
 
 function button(label, handler) {
@@ -83,7 +89,7 @@ function button(label, handler) {
 function recordDetails(record) {
   const detail = document.createElement("details");
   const title = document.createElement("summary");
-  title.textContent = `${ENDINGS[record.ending].title} · ${record.day}일차`;
+  title.textContent = `${ENDINGS[record.ending].title} · ${record.day}일차 · ${formatMetric(record.mode, "모드")}`;
   const stats = document.createElement("dl");
   for (const [key, name, unit] of METRICS) {
     if (!(key in record)) continue;
@@ -134,7 +140,7 @@ async function renderRank() {
   const category = $("rank-category").value;
   list.textContent = "불러오는 중…";
   try {
-    const { entries } = await api("rank", { category });
+    const { entries } = await api("rank", { category, mode: rankMode });
     if (now !== rankGeneration) return;
     if (!entries.length) {
       list.textContent = "아직 등록된 기록이 없습니다.";
@@ -160,19 +166,21 @@ async function withStatus(operation) {
   busy = true;
   $("account-status").textContent = "처리 중…";
   $("records-back").disabled = true;
-  for (const element of document.querySelectorAll("#account-form input, #account-form button, #save-record, #logout")) element.disabled = true;
+  for (const element of document.querySelectorAll("#account-form input, #account-form button, #save-record, #save-checkpoint, #load-checkpoint, #logout")) element.disabled = true;
   try { $("account-status").textContent = await operation(); }
   catch (error) { $("account-status").textContent = error.message; }
   finally {
     renderAccount();
     $("records-back").disabled = false;
-    for (const element of document.querySelectorAll("#account-form input, #account-form button, #save-record, #logout")) element.disabled = false;
+    for (const element of document.querySelectorAll("#account-form input, #account-form button, #save-record, #save-checkpoint, #load-checkpoint, #logout")) element.disabled = false;
     busy = false;
   }
 }
 
 export function openRecords(record, onBack) {
   active = record ?? localRecord()?.record ?? null;
+  rankMode = isPlayMode(record?.mode) ? record.mode : playMode(runStorage.get()?.state);
+  updateRankMode();
   back = onBack;
   page = 0;
   switchScreen("screen-records");
@@ -184,11 +192,41 @@ export function openRecords(record, onBack) {
   });
 }
 
-export function initRecords(show, onStatus) {
+function updateRankMode() {
+  for (const button of $("rank-modes").querySelectorAll("button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.mode === rankMode));
+  }
+}
+
+export function initRecords(show, onStatus, storage) {
+  runStorage = storage;
   switchScreen = show;
   statusChanged = onStatus;
   for (const [id, { label }] of Object.entries(CATEGORIES)) $("rank-category").add(new Option(label, id));
   $("rank-category").onchange = renderRank;
+  for (const button of $("rank-modes").querySelectorAll("button")) {
+    button.onclick = () => {
+      if (rankMode === button.dataset.mode) return;
+      rankMode = button.dataset.mode;
+      updateRankMode();
+      renderRank();
+    };
+  }
+  $("save-checkpoint").onclick = () => withStatus(async () => {
+    const checkpoint = runStorage.get();
+    if (!checkpoint?.state) return "이 기기에 진행 중인 게임이 없습니다.";
+    const stored = await api("checkpoint");
+    if (stored.checkpoint && !window.confirm("계정에 저장된 이어하기를 이 기기의 진행 내용으로 바꿀까요?")) return "기존 계정 저장을 유지했습니다.";
+    await api("checkpoint", { body: { checkpoint, revision: stored.revision } });
+    return "계정에 진행 내용을 저장했습니다. 다른 기기에서 같은 계정으로 불러올 수 있어요.";
+  });
+  $("load-checkpoint").onclick = () => withStatus(async () => {
+    const { checkpoint } = await api("checkpoint");
+    if (!checkpoint) return "이 계정에 저장한 진행 내용이 없습니다.";
+    if (runStorage.get()?.state && !window.confirm("이 기기의 이어하기를 계정에 저장된 진행 내용으로 바꿀까요?")) return "이 기기의 진행 내용을 유지했습니다.";
+    runStorage.resume(checkpoint);
+    return "계정에 저장한 진행 내용을 불러왔습니다.";
+  });
   $("records-back").onclick = () => back();
   $("account-form").onsubmit = (event) => {
     event.preventDefault();

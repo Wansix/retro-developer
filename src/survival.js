@@ -1,3 +1,5 @@
+import { MODE_TIMER_MULTIPLIER, playMode } from "./play-mode.js";
+
 export const SURVIVAL_RULESET = 12;
 
 export const SURVIVAL = {
@@ -41,7 +43,7 @@ export function beginTask(state, mission, promise) {
   const limit = Math.max(min, Math.min(max, promise.minutes * config.secondsPerMinute));
   state.task = {
     id: mission.id, elapsed: 0, settled: 0, overhead: 0,
-    limit: limit * (state.relaxed ? config.relaxedMultiplier : 1),
+    limit: Math.round(limit * MODE_TIMER_MULTIPLIER[playMode(state)] * (state.relaxed ? config.relaxedMultiplier : 1)),
     burstBonus: 0,
   };
 }

@@ -1619,3 +1619,45 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .lecture-controls button { min-height: 28px; }
 .internet-lecture progress { vertical-align: middle; width: 56%; margin: 0 .3rem .4rem 0; accent-color: #8fbfb7; }
 .lecture-duration { font-variant-numeric: tabular-nums; font-size: .75rem; }
+
+#screen-mode.active { min-height: 100dvh; justify-content: safe center; }
+.mode-terminal { width: min(100%, 42rem); }
+.mode-comdori { display: flex; gap: .8rem; align-items: center; margin-bottom: .8rem; }
+.mode-comdori h2, .mode-comdori p { margin: .15rem 0; }
+.mode-comdori .comdori-avatar { flex: 0 0 auto; }
+#mode-form fieldset { padding: .65rem; border: 1px solid #658158; }
+#mode-form legend { padding-inline: .3rem; }
+.mode-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+.mode-card { display: grid; grid-template-columns: 1fr auto; gap: .34rem; padding: .55rem .7rem; border: 2px solid #819873; cursor: pointer; background: #172416; color: #e8f4df; line-height: 1.35; }
+.mode-card input { grid-column: 2; grid-row: 1; margin: .12rem; accent-color: #a9d083; }
+.mode-card > :not(input) { grid-column: 1 / -1; }
+.mode-card .mode-icon { grid-column: 1; grid-row: 1; font-size: 1.2rem; }
+.mode-terminal-icon { font-family: monospace; font-weight: bold; }
+.mode-card small, #mode-note { font-size: .88rem; }
+.mode-card:has(input:checked) { border-color: #bddf91; background: #2c4127; box-shadow: inset 0 0 0 1px #bddf91; }
+.mode-card:has(input:focus-visible) { outline: 2px solid #f5e6b9; outline-offset: 2px; }
+#mode-note { margin: .6rem 0; line-height: 1.45; }
+#hud-play-mode { color: #e5efd5; font-size: .78rem; font-weight: 700; }
+.coding-terminal > #code-assembly { flex: 1 1 auto; min-height: 0; overflow: auto; }
+#code-assembly { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: .45rem; background: #172117; padding: .35rem; color: #edf4e8; }
+.assembly-pane { min-width: 0; padding: .25rem; }
+.assembly-header { display: flex; justify-content: space-between; align-items: center; gap: .35rem; }
+#code-assembly h3 { font-size: .88rem; margin: .2rem 0; color: #e6efdf; }
+.assembly-hint, #assembly-empty { color: #c7d7ba; font-size: .77rem; margin: .2rem 0; }
+.assembly-fixed { font: .74rem/1.3 monospace; white-space: pre-wrap; overflow-wrap: anywhere; color: #c3d5c1; background: #273527; padding: .22rem; margin: .2rem 0; }
+#assembly-placed, #assembly-pool { display: grid; gap: .25rem; padding: 0; margin: .2rem 0; list-style: none; }
+#assembly-placed li { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: stretch; gap: .15rem; }
+.assembly-key { border: 1px solid #849677; background: #2d402c; color: #f1f6e9; padding: .25rem; min-height: 36px; cursor: pointer; }
+.assembly-key:disabled { opacity: .48; cursor: default; }
+.assembly-piece { text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; font: .78rem/1.35 monospace; }
+#rank-modes button[aria-pressed="true"] { border-color: #bddf91; color: #f2f7e6; background: #3f5d35; }
+@media (max-width: 530px) {
+  .mode-cards { grid-template-columns: 1fr; }
+  .mode-card { grid-template-columns: 1.2rem 1fr auto; align-items: baseline; }
+  .mode-card > strong { grid-column: 2; grid-row: 1; }
+  .mode-card input { grid-column: 3; }
+  .assembly-key { min-height: 40px; }
+}
+.mode-card input { appearance: none; position: relative; width: 1.1rem; height: 1.1rem; border: 1px solid #a6bf96; border-radius: 2px; }
+.mode-card input:checked { background: #bbd899; color: #182314; border-color: #bbd899; }
+.mode-card input:checked::after { content: "✓"; position: absolute; inset: 0; text-align: center; font: bold .89rem/1.03rem sans-serif; }

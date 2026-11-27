@@ -6,10 +6,10 @@ import { dialogueLine } from "./dialogue.js";
 const newDelay = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
 const LESSON_TARGETS = {
   time: "#hud-time-item",
-  input: ".editor-shell",
+  input: ".editor-shell:not(.hidden), #code-assembly:not(.hidden)",
   submit: "#btn-submit",
   score: ".hud-item:has(> #hud-progress), .hud-item:has(> #hud-score)",
-  practice: ".editor-shell",
+  practice: ".editor-shell:not(.hidden), #code-assembly:not(.hidden)",
   health: ".hud-item:has(> #hud-hp)",
   stress: "#hud-stress-item",
   trust: "#scrum-trust",
@@ -147,9 +147,9 @@ export function mountOfficeCompanion({ getState, getShift, survival, paused, onC
     state.seen.push(id);
     state.pending = state.pending.filter(({ event }) => !["coding", "idle", "success"].includes(event));
     const currentRules = survival() && Object.hasOwn(SURVIVAL_TUTORIAL_LINES, topic);
-    const text = dialogueText((currentRules ? "tutorial.current." : "tutorial.") + topic,
+    const lessonText = dialogueText((currentRules ? "tutorial.current." : "tutorial.") + topic,
       (currentRules ? SURVIVAL_TUTORIAL_LINES : TUTORIAL_LINES)[topic]);
-    state.last = { id, event: id, text, at: Date.now() };
+    state.last = { id, event: id, text: lessonText, at: Date.now() };
     typing?.abort();
     say(state.last);
   }

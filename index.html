@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
-<title>옛날 개발자 v0.10.3 — 퇴근하고 싶다</title>
-<link rel="stylesheet" href="src/style.css?v=43">
+<title>옛날 개발자 v0.11.0 — 퇴근하고 싶다</title>
+<link rel="stylesheet" href="src/style.css?v=46">
 </head>
 <body>
   <!-- 타이틀 -->
   <section id="screen-title" class="screen active">
     <div class="terminal">
-      <h1>《옛날 개발자》 <span class="game-version">v0.10.3</span></h1>
+      <h1>《옛날 개발자》 <span class="game-version">v0.11.0</span></h1>
       <p class="sub">코딩은 쉬운데 퇴근이 어려운 게임.</p>
       <p class="line">2026년, 어느 개발자의 퇴근 2분 전.</p>
       <button id="btn-start" class="btn">게임 시작</button>
@@ -107,15 +107,48 @@
   <!-- 타이틀 카드 -->
   <section id="screen-titlecard" class="screen">
     <div class="titlecard">
-      <h1 class="bigtitle">옛날 개발자 <span class="game-version">v0.10.3</span></h1>
+      <h1 class="bigtitle">옛날 개발자 <span class="game-version">v0.11.0</span></h1>
       <p class="tagline">미래소프트™ 개발 3팀</p>
       <p class="tagline2">코딩은 쉬운데 퇴근이 어려운 게임.</p>
       <button id="btn-gotowork" class="btn primary">첫 출근하기</button>
     </div>
   </section>
 
+  <section id="screen-mode" class="screen" aria-labelledby="mode-title">
+    <div class="terminal mode-terminal">
+      <div class="mode-comdori">
+        <span class="comdori-avatar" aria-hidden="true"></span>
+        <div><h2 id="mode-title" tabindex="-1">컴돌이</h2><p id="mode-dialogue" role="status"></p></div>
+      </div>
+      <form id="mode-form">
+        <fieldset aria-describedby="mode-note">
+          <legend>업무 수행 방식</legend>
+          <div class="mode-cards">
+            <label class="mode-card">
+              <input type="radio" name="mode" value="assembly" required>
+              <span class="mode-icon" aria-hidden="true">🧩</span>
+              <strong>코드 조립 모드</strong>
+              <span>코드 조각을 선택하고 배치하여 업무를 해결합니다.</span>
+              <small>코딩 경험 없이도 도전 가능 · 모바일 추천</small>
+            </label>
+            <label class="mode-card">
+              <input type="radio" name="mode" value="real_coding" required>
+              <span class="mode-icon mode-terminal-icon" aria-hidden="true">&gt;_</span>
+              <strong>리얼 코딩 모드</strong>
+              <span>직접 코드를 작성하고 실행하여 업무를 해결합니다.</span>
+              <small>실제 개발자 경험 · PC 추천</small>
+            </label>
+          </div>
+        </fieldset>
+        <p id="mode-note">스토리와 회사 생활은 동일합니다. 랭킹은 모드별로 집계되며 플레이 도중 변경할 수 없습니다.</p>
+        <button class="btn primary" id="mode-confirm" type="submit" disabled>선택 완료</button>
+      </form>
+    </div>
+  </section>
+
   <section id="screen-office" class="screen">
     <header id="hud">
+      <span id="hud-play-mode" class="hud-item"></span>
       <div class="hud-item"><span class="hud-label"><span class="stat-icon" aria-hidden="true">▦</span>입사</span><strong id="hud-date"></strong></div>
       <div class="hud-item"><span class="hud-label"><span class="stat-icon deadline-icon" aria-hidden="true">⚑</span>마감</span><strong id="hud-dday"></strong></div>
       <div id="hud-time-item" class="hud-item hidden"><span class="hud-label"><span class="stat-icon time-icon" aria-hidden="true">◷</span>업무 시간</span><strong id="hud-time"></strong><span id="internet-time-loss" aria-hidden="true"></span></div>
@@ -264,6 +297,20 @@
               <pre class="editor-highlight" aria-hidden="true"><code id="editor-highlight"></code></pre>
               <textarea id="editor" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"></textarea>
             </div>
+            <section id="code-assembly" class="hidden" aria-labelledby="assembly-title">
+              <div class="assembly-pane">
+                <div class="assembly-header"><h3 id="assembly-title" tabindex="-1">조립할 코드</h3><button id="assembly-reset" class="act-btn" type="button">초기화</button></div>
+                <pre class="assembly-fixed" id="assembly-before" aria-label="위쪽 기본 제공 코드"></pre>
+                <p id="assembly-empty">아래에서 조각을 눌러 채우세요.</p>
+                <ol id="assembly-placed" aria-label="배치한 조각"></ol>
+                <pre class="assembly-fixed" id="assembly-after" aria-label="아래쪽 기본 제공 코드"></pre>
+              </div>
+              <div class="assembly-pane">
+                <h3>코드 조각</h3>
+                <p class="assembly-hint">눌러서 추가하거나 제거하세요. ↑ ↓로 옮길 수 있어요.</p>
+                <div id="assembly-pool" aria-label="사용할 수 있는 코드 조각"></div>
+              </div>
+            </section>
             <div class="actions">
               <button id="btn-run" class="btn">실행</button>
               <button id="btn-submit" class="btn primary" aria-describedby="submit-status">업무 제출</button>
@@ -300,7 +347,7 @@
           <div class="compdori-copy">
             <div class="compdori-heading">
               <h2 id="compdori-name">컴돌이</h2>
-              <button id="lesson-next" class="btn primary hidden" type="button">다음 · 코드 입력 <span aria-hidden="true">↓</span></button>
+              <button id="lesson-next" class="btn primary hidden" type="button"><span id="lesson-next-label">다음 · 코드 입력</span> <span aria-hidden="true">↓</span></button>
             </div>
             <p id="compdori-text" aria-live="polite" aria-atomic="true"></p>
           </div>
@@ -413,6 +460,8 @@
       </form>
       <div class="actions record-actions">
         <button id="save-record" class="btn primary hidden">이번 결산 저장</button>
+        <button id="save-checkpoint" class="btn hidden" type="button">계정에 이어하기 저장</button>
+        <button id="load-checkpoint" class="btn hidden" type="button">계정에서 이어하기 불러오기</button>
         <button id="logout" class="btn hidden">로그아웃</button>
       </div>
       <div id="history-panel" class="hidden">
@@ -420,11 +469,15 @@
         <div id="history-list"></div>
       </div>
       <h2>전체 랭킹</h2>
+      <div id="rank-modes" class="actions" role="group" aria-label="랭킹 모드">
+        <button class="btn" type="button" data-mode="assembly" aria-pressed="false">코드 조립 모드</button>
+        <button class="btn" type="button" data-mode="real_coding" aria-pressed="true">리얼 코딩 모드</button>
+      </div>
       <label class="record-category">종목 <select id="rank-category"></select></label>
       <div id="rank-list" aria-live="polite"></div>
       <button id="records-back" class="btn">돌아가기</button>
     </div>
   </section>
-  <script type="module" src="src/main.js?v=45"></script>
+  <script type="module" src="src/main.js?v=46"></script>
 </body>
 </html>

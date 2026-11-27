@@ -1,3 +1,4 @@
+import { isPlayMode, MODE_RULESET, playMode } from "./play-mode.js";
 import { ARCHITECTURE, AUTOMATION, CODE_REVIEW, DEPARTMENTS, ENDINGS, EXTRA_TICKETS, LUNCH, OFFICE_EVENTS, TICKETS } from "./office-content.js";
 import { MISSIONS } from "./missions.js";
 import { CHAINED_WORK_RULESET, DIRECT_ASSIGNMENT_RULESET, FUNDAMENTALS_RULESET, LANGUAGE_ASSIGNMENT_RULESET, OFFICE_CLOCK_RULESET, PROBLEM_BANK_RULESET, PROJECT_WORKDAYS, RULESET, SATURDAY_SHIFT_RULESET, SCRUM_RULESET, SHORT_PROJECT_RULESET, TOTAL_DAYS, WORK_CONTENT_RULESET, calendarDayForWorkday, formatMinutes, workdayForCalendarDay } from "./records-schema.js";
@@ -98,7 +99,7 @@ function draw(s) {
   return s.rng / 2 ** 32;
 }
 
-export function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0], id = crypto.randomUUID(), ruleset = RULESET) {
+export function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0], id = crypto.randomUUID(), ruleset = RULESET, mode = "real_coding") {
   const run = {
     id, seed, ruleset, rng: seed, moves: [], day: 1, shift: 0, hp: 100, score: 0, scope: 0, progress: 0,
     phase: "arrive", ending: null, completedDay: null, nextMeeting: 0, effects: [],
@@ -107,6 +108,7 @@ export function newRun(seed = crypto.getRandomValues(new Uint32Array(1))[0], id 
     achievements: [],
     requestCount: {},
   };
+  if (ruleset >= MODE_RULESET) run.mode = isPlayMode(mode) ? mode : "real_coding";
   run.deadline = projectLimit(run);
   if (ruleset >= SCRUM_RULESET) initScrum(run);
   if (hasWorkContent(run)) {
@@ -471,6 +473,10 @@ function completeWork(s, mission, move) {
   const overdue = timed && task && taskOverdue(task);
   if (timed) {
     if (speedy) s.stats.fastJobs++;
+    if (s.ruleset >= MODE_RULESET && mission.type === "code" && task && move !== DEBUG_PASS_MOVE) {
+      const elapsed = Math.max(1, task.elapsed);
+      s.stats.fastestWorkSeconds = Math.min(s.stats.fastestWorkSeconds ?? elapsed, elapsed);
+    }
     if (focused && s.stats.burstSaved + normalMinutes - minutes >= 30) award(s, "한계를 돌파한 개발자");
     if (!task?.missed) changeTrust(s, 1);
     if (focused) s.stats.burstSaved += normalMinutes - minutes;
@@ -580,7 +586,7 @@ export function playMinesAction(s, action, value) {
 
 export function recordPaste(s, attempts = 1) {
   const mission = currentMission(s);
-  if (s.ending || !taskIsOpen(s) || s.leisure?.open || !isCoding(s.phase) || !mission || (mission.type && mission.type !== "code") || s.solvedToday) return 0;
+  if (playMode(s) === "assembly" || s.ending || !taskIsOpen(s) || s.leisure?.open || !isCoding(s.phase) || !mission || (mission.type && mission.type !== "code") || s.solvedToday) return 0;
   const previous = s.stats.paste;
   const added = Math.min(1000000 - previous, attempts);
   if (added) {
@@ -598,6 +604,18 @@ function finish(s, id) {
   if (!ENDINGS[id].cleared && s.stats.minesWins > 0) award(s, "지뢰 제거 전문가");
   s.ending = id;
   s.completedDay = ENDINGS[id].cleared ? s.day : null;
+  if (s.completedDay && s.ruleset >= MODE_RULESET) {
+    award(s, playMode(s) === "assembly" ? "조립의 달인" : "야생의 개발자");
+    if (s.mobileFinish) award(s, "엄지손가락 개발자");
+  }
+}
+
+export function markMobileFinish(s) {
+  if (s.ruleset < MODE_RULESET || s.ending || s.mobileFinish || !projectReady(s) ||
+      !["leave", "overtime"].includes(s.phase)) return false;
+  s.mobileFinish = true;
+  s.moves.push("mobile-finish");
+  return true;
 }
 
 function finishShift(s) {
@@ -1194,6 +1212,7 @@ export function act(s, id) {
 export function recordFor(s) {
   const record = { id: s.id, ending: s.ending, day: projectDay(s), progress: s.progress, ...s.stats, hp: s.hp,
     completedDay: s.completedDay === null ? null : projectDay(s, s.completedDay), achievements: [...s.achievements] };
+  record.mode = playMode(s);
   if (hasWorkContent(s)) record.stress = s.stress;
   if (hasShortProject(s)) {
     record.missionTotal = missionCount(s);
@@ -1216,8 +1235,9 @@ export function recordFor(s) {
   return record;
 }
 
-export function replayRun({ id, seed, moves, ruleset = RULESET }) {
-  const run = newRun(seed, id, ruleset);
+export function replayProgress({ id, seed, moves, ruleset = RULESET, mode }) {
+  if (ruleset >= MODE_RULESET && !isPlayMode(mode)) return null;
+  const run = newRun(seed, id, ruleset, mode);
   for (const move of moves) {
     if (run.ending) return null;
     if (typeof move === "number") {
@@ -1239,6 +1259,8 @@ export function replayRun({ id, seed, moves, ruleset = RULESET }) {
         const result = playMinesAction(run, action, value);
         if (!result || (action === "tick" && result !== value)) return null;
       } else return null;
+    } else if (move === "mobile-finish") {
+      if (!markMobileFinish(run)) return null;
     } else if (move === "work-search") {
       if (!searchAtWork(run)) return null;
     } else if (move === "burst") {
@@ -1255,7 +1277,12 @@ export function replayRun({ id, seed, moves, ruleset = RULESET }) {
       if (!delegateCodeWork(run)) return null;
     } else if (move === "solve" ? !submitSolution(run) : move === "code-retry" ? !failCodeSubmission(run) : !act(run, move)) return null;
   }
-  return run.ending ? recordFor(run) : null;
+  return run;
+}
+
+export function replayRun(proof) {
+  const run = replayProgress(proof);
+  return run?.ending ? recordFor(run) : null;
 }
 
 export function enableRelaxed(s) {

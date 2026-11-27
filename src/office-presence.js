@@ -1,7 +1,7 @@
 import { dialogueText } from "./dialogue-overrides.js";
 
 export const PRESENCE_LINES = {
-  mobile: "신입, 휴대폰으로 코딩해? …잘 되면 나한테도 한번 보여줘.",
+  mobile: "신입, 누가 휴대폰으로 개발하래?",
   mobileWork: "업무 시간에 누가 폰 보래? 아, 검수 중이라고? 화면이 너무 작아서 몰랐네.",
   tab: "자네, 아까 다른 창으로 갔던데. 찾아보던 건 해결됐어?",
   window: "볼일은 다 봤나? 이쪽은 아까 화면 그대로야.",
@@ -35,6 +35,7 @@ export function mountOfficePresence({ editor, active, available, read, save, bos
     if (!active() || !available() || document.hidden || Date.now() - lastLine < 65000 || read().includes(kind)) return false;
     const said = PRESENCE_LINES[kind] ? (boss(dialogueText("presence." + kind, PRESENCE_LINES[kind])), true) : companion(kind);
     if (!said) return false;
+    if (kind === "mobile" || kind === "mobileWork") companion("mobileDevice");
     lastLine = Date.now();
     save(kind);
     return true;

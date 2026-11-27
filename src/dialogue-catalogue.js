@@ -17,7 +17,7 @@ const SPEAKERS = { ...CAST_NAMES, ai: "컴돌이", check: "플레이어 확인 �
 const CHOICES = { park: "박 대리와 점심", help: "이 대리 도움", kim: "김 과장과 점심", yes: "수락", no: "불가능", trim: "범위 축소", joke: "영업팀 농담", accept: "요청 수락", document: "서면 정리", push: "거절·일정 협상", ally: "담당자와 공동 대응" };
 const TUTORIALS = { time: "업무 시간", input: "첫 코드 입력", submit: "업무 제출", score: "평판 보상", practice: "문법 업무", health: "체력", stress: "스트레스", trust: "보고 신뢰도", scope: "추가 일감", deadline: "마감" };
 const COMPANION_EVENTS = {
-  burst: "버스트 발동", sunday: "일요일 휴식", lateLocal: "현실에서 새벽에 플레이", longIdle: "작업 중 장시간 무입력",
+  mobileDevice: "휴대폰으로 개발할 때", burst: "버스트 발동", sunday: "일요일 휴식", lateLocal: "현실에서 새벽에 플레이", longIdle: "작업 중 장시간 무입력",
   coding: "새 코딩 업무 시작", success: "검수 통과", error: "실행·검수 오류", search: "가상 검색 사용",
   meeting: "회의 시작", meetingLong: "긴 회의", overtime: "야근 선택", leave: "정시 퇴근",
   mines: "지뢰찾기 시작", scolded: "복붙·지뢰찾기로 질책", idle: "할 일이 없을 때 혼잣말",

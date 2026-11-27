@@ -1,13 +1,14 @@
 import { Buffer } from "node:buffer";
 import { createHash, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { replayRun } from "../../src/office.js";
-import { CATEGORIES, FIRST_RULESET, RULESET, WORK_CONTENT_RULESET } from "../../src/records-schema.js";
+import { CATEGORIES } from "../../src/records-schema.js";
+import { isPlayMode } from "../../src/play-mode.js";
+import { normalizeCheckpoint, RUN_ID, validRunProof } from "../../src/run-checkpoint.js";
 
 const COOKIE = "retro_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 14;
 const AUTH_WINDOW = 15 * 60;
 const HISTORY_PAGE = 20;
-const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
 const hashToken = (token) => createHash("sha256").update(token).digest("hex");
 const ts = () => Math.floor(Date.now() / 1000);
 const integer = (n, min, max) => Number.isInteger(n) && n >= min && n <= max;
@@ -94,23 +95,31 @@ async function authenticate(context, action, body) {
 }
 
 async function saveRun(db, account, body) {
-  if (!integer(body?.ruleset, FIRST_RULESET, RULESET) || typeof body.id !== "string" || !UUID.test(body.id) || !integer(body.seed, 0, 0xffffffff) ||
-    !Array.isArray(body.moves) || !integer(body.moves.length, 1, body.ruleset >= WORK_CONTENT_RULESET ? 8192 : 500)) return problem("결산 기록이 올바르지 않습니다.", 400);
-  const summary = replayRun({ id: body.id.toLowerCase(), seed: body.seed, moves: body.moves, ruleset: body.ruleset });
+  if (!validRunProof(body)) return problem("결산 기록이 올바르지 않습니다.", 400);
+  const summary = replayRun({ id: body.id.toLowerCase(), seed: body.seed, moves: body.moves, ruleset: body.ruleset, mode: body.mode });
   if (!summary) return problem("결산 기록이 올바르지 않습니다.", 400);
-  const result = await db.prepare("INSERT INTO runs VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING")
-    .bind(summary.id, account.id, JSON.stringify(summary), ts()).run();
+  const savedMode = await db.prepare("SELECT json_extract(checkpoint, '$.state.mode') AS mode FROM checkpoints WHERE account_id = ? AND run_id = ?")
+    .bind(account.id, summary.id).first();
+  if (savedMode?.mode && savedMode.mode !== summary.mode) return problem("회차의 업무 수행 방식이 다릅니다.", 409);
+  const [result] = await db.batch([
+    db.prepare("INSERT INTO runs VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING")
+      .bind(summary.id, account.id, JSON.stringify(summary), ts()),
+    db.prepare(`DELETE FROM checkpoints WHERE account_id = ? AND run_id = ?
+      AND EXISTS (SELECT 1 FROM runs WHERE id = ? AND account_id = ?)`).bind(account.id, summary.id, summary.id, account.id),
+  ]);
   if (result.meta.changes) return json({ saved: true }, 201);
   const existing = await db.prepare("SELECT id FROM runs WHERE id = ? AND account_id = ?").bind(summary.id, account.id).first();
   if (!existing) return problem("이미 다른 계정에 저장된 결산입니다.", 409);
   return json({ saved: true });
 }
 
-async function leaderboard(db, category) {
+async function leaderboard(db, category, playMode) {
+  if (!isPlayMode(playMode)) return problem("랭킹 모드가 올바르지 않습니다.", 400);
   if (!Object.hasOwn(CATEGORIES, category)) return problem("랭킹 종목이 올바르지 않습니다.", 400);
   const { key, order, clears, mode } = CATEGORIES[category];
   const filters = [
     "COALESCE(json_extract(summary, '$.timeMode'), '기본') != '완화'",
+    "COALESCE(json_extract(summary, '$.mode'), 'real_coding') = ?",
     `json_extract(summary, '$.${key}') IS NOT NULL`,
     ...(clears ? ["json_extract(summary, '$.completedDay') IS NOT NULL"] : []),
     ...(mode === "legacy" ? ["json_extract(summary, '$.timeMode') IS NULL"] : mode === "survival" ? ["json_extract(summary, '$.timeMode') IS NOT NULL"] : []),
@@ -123,8 +132,33 @@ async function leaderboard(db, category) {
   )
   SELECT accounts.handle, value, DENSE_RANK() OVER (ORDER BY value ${order}) AS rank
   FROM best_runs JOIN accounts ON accounts.id = account_id
-  ORDER BY value ${order}, accounts.handle_key LIMIT 25`).all();
+  ORDER BY value ${order}, accounts.handle_key LIMIT 25`).bind(playMode).all();
   return json({ entries: results });
+}
+
+async function getCheckpoint(db, account) {
+  const row = await db.prepare("SELECT checkpoint, revision FROM checkpoints WHERE account_id = ?").bind(account.id).first();
+  return json({ checkpoint: row ? JSON.parse(row.checkpoint) : null, revision: row?.revision ?? null });
+}
+
+async function saveCheckpoint(db, account, body) {
+  if (body?.revision !== null && (typeof body?.revision !== "string" || !RUN_ID.test(body.revision))) {
+    return problem("저장 버전이 올바르지 않습니다.", 400);
+  }
+  const checkpoint = normalizeCheckpoint(body?.checkpoint);
+  if (!checkpoint) return problem("계정에 저장할 수 있는 진행 상태가 아닙니다.", 400);
+  const revision = crypto.randomUUID();
+  const { id } = checkpoint.state;
+  const result = await db.prepare(`INSERT INTO checkpoints (account_id, run_id, revision, checkpoint)
+    SELECT ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM runs WHERE id = ?)
+    ON CONFLICT(account_id) DO UPDATE SET run_id = excluded.run_id, revision = excluded.revision, checkpoint = excluded.checkpoint
+    WHERE checkpoints.revision = ? AND (
+      checkpoints.run_id <> excluded.run_id OR
+      COALESCE(json_extract(checkpoints.checkpoint, '$.state.mode'), 'real_coding') =
+      COALESCE(json_extract(excluded.checkpoint, '$.state.mode'), 'real_coding')
+    )`).bind(account.id, id, revision, JSON.stringify(checkpoint), id, body.revision).run();
+  return result.meta.changes ? json({ revision }) :
+    problem("계정 저장이 다른 기기에서 바뀌었거나 이미 완료된 회차입니다. 기록실에서 다시 확인해 주세요.", 409);
 }
 
 async function readBody(request, maxBytes = 8192) {
@@ -155,9 +189,10 @@ export async function onRequest({ request, env, waitUntil }) {
   const action = url.searchParams.get("view") ?? "session";
   try {
     if (request.method === "GET") {
-      if (action === "rank") return await leaderboard(db, url.searchParams.get("category"));
+      if (action === "rank") return await leaderboard(db, url.searchParams.get("category"), url.searchParams.get("mode") ?? "real_coding");
       const account = await accountFrom(db, tokenFrom(request));
       if (action === "session") return json({ handle: account?.handle ?? null });
+      if (action === "checkpoint") return account ? getCheckpoint(db, account) : problem("로그인이 필요합니다.", 401);
       if (action !== "history") return problem("기록실 메뉴를 찾지 못했습니다.", 404);
       if (!account) return problem("로그인이 필요합니다.", 401);
       const page = Number(url.searchParams.get("page") ?? 0);
@@ -175,12 +210,12 @@ export async function onRequest({ request, env, waitUntil }) {
       if (token) await db.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(token).run();
       return json({ handle: null }, 200, { "Set-Cookie": sessionCookie(request, "", 0) });
     }
-    if (action === "save") {
+    if (action === "save" || action === "checkpoint") {
       const account = await accountFrom(db, token);
       if (!account) return problem("로그인이 필요합니다.", 401);
       let body;
       try { body = await readBody(request, 192 * 1024); } catch { return problem("요청 내용을 읽을 수 없습니다.", 400); }
-      return await saveRun(db, account, body);
+      return action === "save" ? await saveRun(db, account, body) : await saveCheckpoint(db, account, body);
     }
     let body;
     try { body = await readBody(request); } catch { return problem("요청 내용을 읽을 수 없습니다.", 400); }

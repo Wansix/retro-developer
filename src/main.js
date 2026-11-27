@@ -1,3 +1,6 @@
+import { assemblyCode, assemblyPlan } from "./code-assembly.js";
+import { mountAssembly } from "./code-assembly-ui.js";
+import { isPlayMode, PLAY_MODES, playMode } from "./play-mode.js";
 import { CLOCK_REPLIES, MINE_REPLIES, officeCopy } from "./office-copy.js";
 import { dialoguePool, dialogueText, editedScript, loadDialogueOverrides } from "./dialogue-overrides.js";
 import { BOSS_LINES, MISSIONS, PASTE_LINES, SCENE_2006, TRAVEL_LINES, WRONG_RUN_LINES } from "./missions.js";
@@ -7,7 +10,7 @@ import {
   CLEANUP_MINUTES, CODE_DELEGATION, CODE_REVIEW_MINUTES, DEBUG_PASS_MOVE, PHASES, RELATION_NAMES, act, canDelegateCode, canReviewCode,
   canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, failPracticeRun, hasDirectAssignments,
   hasChainedWork, hasLanguageAssignment, hasOfficeClock, hasProblemBank, hasSaturdayShift, hasShortProject, hasWorkContent, isCoding, isFriday, isHalfDay, isTutorial, missionCount,
-  missionNotice, needsAssignment, newRun, nextAssignment, officeTime, options, passWorkForDebug, projectDay, recordFor, recordPaste, requestCodeReview,
+  markMobileFinish, missionNotice, needsAssignment, newRun, nextAssignment, officeTime, options, passWorkForDebug, projectDay, recordFor, recordPaste, requestCodeReview,
   submitSolution, submitSpecialWork, deferWork, enableRelaxed, taskIsOpen, useBurst, useInternet,
 } from "./office.js";
 import { WORK_TYPES, workResultRows } from "./work-missions.js";
@@ -17,7 +20,7 @@ import { mountIntranet } from "./intranet-ui.js";
 
 import { newCompanionState } from "./comdori-commentary.js";
 import { mountOfficeCompanion } from "./comdori-companion.js";
-import { FIRST_RULESET, METRICS, PROJECT_WORKDAYS, TOTAL_DAYS, formatDate, formatMetric, formatMinutes, internetRecordRows } from "./records-schema.js";
+import { FIRST_RULESET, METRICS, RULESET, PROJECT_WORKDAYS, TOTAL_DAYS, formatDate, formatMetric, formatMinutes, internetRecordRows } from "./records-schema.js";
 import { SCRUM_REPORTS } from "./scrum.js";
 import { initRecords, openRecords, syncRecord } from "./records.js";
 import { dialogueLine, initDialogueSound, playDeadlineCue, playFootsteps, typeDialogue } from "./dialogue.js";
@@ -36,8 +39,11 @@ const LOCAL_DEBUG = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostna
 const editor = $("editor");
 const paintEditor = mountCodeHighlight(editor, $("editor-highlight"));
 const coworkerHelp = $("coworker-help");
+const mobileInput = matchMedia("(pointer: coarse) and (hover: none)");
 let state;
 let draft = null;
+let assemblyDraft = null;
+let activeAssemblyPlan;
 let workDraft = null;
 let internetState = { open: false, tabs: {} };
 let companionState = newCompanionState();
@@ -209,8 +215,14 @@ function saveLocal(key, value) {
 }
 
 function checkpoint() {
-  if (state && !state.ending) saveLocal(RUN_KEY, { state, draft, workDraft, internetState, companionState, presenceSeen });
+  if (state && !state.ending) saveLocal(RUN_KEY, { state, draft, assemblyDraft, workDraft, internetState, companionState, presenceSeen });
 }
+
+const assembly = mountAssembly(order => {
+  assemblyDraft = { id: currentMission(state).id, order };
+  checkpoint();
+  renderCoding();
+});
 
 const inOffice = () => $("screen-office").classList.contains("active");
 const taskTimer = mountWorkTimer({
@@ -252,7 +264,7 @@ const companion = mountOfficeCompanion({
   onChange: checkpoint,
   onLessonNext() {
     companion.teach("input");
-    editor.focus({ preventScroll: true });
+    (playMode(state) === "assembly" ? $("assembly-title") : editor).focus({ preventScroll: true });
   },
 });
 
@@ -484,6 +496,9 @@ function peekAtClock() {
 function hud() {
   if (clockPeekPhase && clockPeekPhase !== clockPhase()) hideClockTime();
   else if (clockPeekPhase) updateClockReadout();
+  const mode = playMode(state);
+  $("hud-play-mode").textContent = PLAY_MODES[mode];
+  $("lesson-next-label").textContent = mode === "assembly" ? "다음 · 코드 조립" : "다음 · 코드 입력";
   $("hud-date").textContent = state.phase === "sunday" ? formatDate(state.day) : `${projectDay(state)}일차 · ${formatDate(state.day)}`;
   $("hud-dday").textContent = `D-${projectDay(state, state.deadline) - projectDay(state)}`;
   $("hud-dday").title = hasShortProject(state) ? "남은 근무일 기준" : "남은 날짜 기준";
@@ -604,7 +619,8 @@ function phaseStory() {
       if (!mission) return `${budget} 필수 기능 검수가 끝났다. 남은 추가 일감을 정리하고 퇴근하면 배포할 수 있다.`;
       if (state.solvedToday && !hasSurvival(state)) return `${budget} 오늘 배정된 업무는 검수를 통과했다.`;
       if ((!hasSurvival(state) || state.task) && isTutorial(state) && (!hasChainedWork(state) || state.activeWork === OPENING_WORK)) {
-        return "아래에 코드를 한 줄 입력하세요. 실행으로 결과를 확인하고 업무 제출을 누르면 됩니다.";
+        return playMode(state) === "assembly" ? "코드 조각을 눌러 첫인사를 출력하세요. 실행으로 확인한 뒤 업무 제출을 누르면 됩니다." :
+          "아래에 코드를 한 줄 입력하세요. 실행으로 결과를 확인하고 업무 제출을 누르면 됩니다.";
       }
       if (hasSurvival(state)) {
         if (state.solvedToday) return `${budget} 업무표에 남겨 두었다. 다음 근무일에 초안부터 이어간다.`;
@@ -743,7 +759,9 @@ function takeOfficeAction(id) {
   const previousPhase = state.phase;
   const previousMeetings = state.stats.meetings;
   taskTimer.flush();
-  if (busy || !act(state, id)) return;
+  if (busy) return;
+  if (mobileInput.matches && (id === "leave" || (id === "next" && state.phase === "overtime"))) markMobileFinish(state);
+  if (!act(state, id)) return;
   if (state.ending) {
     endRun();
     return;
@@ -812,18 +830,28 @@ function renderCoding() {
     clearTimeout(idle);
     return;
   }
+  const assembling = playMode(state) === "assembly";
+  $("code-assembly").classList.toggle("hidden", !assembling);
+  editor.parentElement.classList.toggle("hidden", assembling);
+  $("editor-file").htmlFor = assembling ? "" : "editor";
   if (shownMission !== mission.id) {
     shownMission = mission.id;
     $("mission-title").textContent = mission.title;
-    $("mission-req").textContent = mission.requirement;
+    $("mission-req").textContent = assembling && mission.id === MISSIONS[0].id ?
+      "Hello, World!가 출력되도록 코드 조각을 골라 배치하세요." : mission.requirement;
     $("mission-expected").textContent = mission.expectedOut;
     const language = state.language ?? "python";
     $("editor-file").textContent = LANGUAGES[language].file;
     $("mission-delegation-options").open = false;
-    editor.value = draft?.id === mission.id ? draft.code : mission.starter;
-    editor.scrollTop = 0;
-    editor.scrollLeft = 0;
-    paintEditor(language);
+    if (assembling) {
+      activeAssemblyPlan = assemblyPlan(mission, language, state.seed);
+      assembly.setup(activeAssemblyPlan, assemblyDraft?.id === mission.id ? assemblyDraft.order : []);
+    } else {
+      editor.value = draft?.id === mission.id ? draft.code : mission.starter;
+      editor.scrollTop = 0;
+      editor.scrollLeft = 0;
+      paintEditor(language);
+    }
     $("paste-warning").textContent = "";
     $("internet-open-status").textContent = "";
     output("실행 버튼을 눌러 결과를 확인하세요.");
@@ -831,7 +859,8 @@ function renderCoding() {
   renderCodingSupport(mission);
   const cost = codingCost(state);
   $("btn-submit").textContent = `업무 제출 · ${formatMinutes(cost)}`;
-  $("btn-submit").disabled = busy || !canSubmit(state);
+  const needsPieces = assembling && !assembly.order().length;
+  $("btn-submit").disabled = busy || needsPieces || !canSubmit(state);
   $("code-debug-pass").disabled = busy || !canSubmit(state);
   const missing = cost - state.remaining;
   const next = submissionNextAction(options(state));
@@ -849,8 +878,9 @@ function renderCoding() {
   nextButton.classList.toggle("hidden", !next || busy);
   nextButton.textContent = next?.id === "prepare" ? `사전 조사 · ${formatMinutes(Math.min(state.cost, state.remaining))}` : next?.label ?? "";
   nextButton.onclick = next ? () => takeOfficeAction(next.id) : null;
-  $("btn-run").disabled = busy;
-  editor.disabled = busy;
+  $("btn-run").disabled = busy || needsPieces;
+  editor.disabled = busy || assembling;
+  assembly.setBusy(busy);
   resetIdle();
 }
 
@@ -998,11 +1028,12 @@ function showOfficeGuide() {
   resetIdle();
 }
 
-function enterOffice(resume = false) {
-  const saved = resume ? loadLocal(RUN_KEY) : null;
-  state = saved?.state ?? newRun();
-  if (!saved?.state && $("relaxed-timer").checked) enableRelaxed(state);
+function enterOffice(resume = false, fallbackRun, transferred) {
+  const saved = transferred ?? (resume ? loadLocal(RUN_KEY) : null);
+  state = saved?.state ?? fallbackRun ?? newRun();
   draft = saved?.draft ?? null;
+  assemblyDraft = saved?.assemblyDraft ?? null;
+  activeAssemblyPlan = null;
   workDraft = saved?.workDraft ?? null;
   internetState = saved?.internetState ?? { open: false, tabs: {} };
   companionState = saved?.companionState ?? newCompanionState();
@@ -1116,7 +1147,8 @@ async function handleCode(submit) {
   const language = state.language ?? "python";
   const label = LANGUAGES[language].name;
   output(runner?.ready ? `${label} 실행 중…` : `${label} 실행기를 준비하고 있어요. 첫 실행은 조금 더 걸려요.`);
-  const result = await runCode(language, editor.value, mission.check, submit).catch(() => ({ unavailable: true }));
+  const code = playMode(state) === "assembly" ? assemblyCode(activeAssemblyPlan, assembly.order()) : editor.value;
+  const result = await runCode(language, code, mission.check, submit).catch(() => ({ unavailable: true }));
   busy = false;
   taskTimer.sync();
   const wrongRun = !submit && result.ok && result.passed === false;
@@ -1143,10 +1175,11 @@ async function handleCode(submit) {
   if (submit && result.passed) {
     submitSolution(state);
     draft = null;
+    assemblyDraft = null;
     if (state.ending) return endRun();
     const internetComment = state.web?.jobs[mission.id]?.assisted;
     renderOffice(true, { reaction: state.scope > 0 && state.phase === "morning" ? "success" : null });
-    companion.emit(internetComment ? `web-${internetComment}` : "success");
+    companion.emit(internetComment ? "web-solved" : "success");
   } else {
     renderChoices();
     renderCoding();
@@ -1199,6 +1232,14 @@ editor.addEventListener("keydown", (e) => {
 let lastRecord;
 let syncVersion = 0;
 
+function bestKeyFor(mode) {
+  return mode === "assembly" ? BEST_KEY + ":assembly" : BEST_KEY;
+}
+
+function bestLabel(record) {
+  return record.timeMode ? `최단 납품 ${formatMetric(record.deliveryMinute, "시각")}` : `최단 완료 ${record.completedDay}일차`;
+}
+
 function showResult(record) {
   show("screen-ending");
   const ending = ENDINGS[record.ending];
@@ -1229,8 +1270,8 @@ function showResult(record) {
     return row;
   }));
   replaceList($("ending-award"), record.achievements.map((title) => `업적 · ${title}`));
-  const best = loadLocal(BEST_KEY);
-  $("ending-best").textContent = best ? `이 브라우저 최단 완료 · ${best.timeMode ? formatMetric(best.deliveryMinute, "시각") : best.completedDay + "일차"}` : "";
+  const best = loadLocal(bestKeyFor(record.mode));
+  $("ending-best").textContent = best ? `이 브라우저 · ${PLAY_MODES[record.mode]} ${bestLabel(best)}` : "";
 }
 
 function endRun() {
@@ -1244,11 +1285,12 @@ function endRun() {
   $("ending-sync").textContent = debug ? "디버그 회차는 기록에 저장되지 않습니다." : "";
   const version = ++syncVersion;
   if (!debug) {
-    const best = loadLocal(BEST_KEY);
+    const bestKey = bestKeyFor(record.mode);
+    const best = loadLocal(bestKey);
     if (record.timeMode !== "완화" && record.completedDay &&
         (!best || (record.timeMode ? best.deliveryMinute == null || record.deliveryMinute < best.deliveryMinute :
-          !best.timeMode && record.completedDay < best.completedDay))) saveLocal(BEST_KEY, record);
-    syncRecord(record, { ruleset: state.ruleset, id: state.id, seed: state.seed, moves: state.moves }).then((message) => {
+          !best.timeMode && record.completedDay < best.completedDay))) saveLocal(bestKey, record);
+    syncRecord(record, { ruleset: state.ruleset, id: state.id, seed: state.seed, moves: state.moves, mode: state.mode }).then((message) => {
       if (version === syncVersion) $("ending-sync").textContent = message;
     });
   }
@@ -1286,10 +1328,13 @@ function title() {
   try {
     $("btn-skip-intro").classList.toggle("hidden", !localStorage.getItem("retro-intro-seen"));
   } catch { /* A restricted browser can still play the intro. */ }
-  const best = loadLocal(BEST_KEY);
+  const bests = Object.entries(PLAY_MODES).flatMap(([mode, label]) => {
+    const best = loadLocal(bestKeyFor(mode));
+    return best ? [`${label} ${bestLabel(best)}`] : [];
+  });
   const legacy = loadLocal("retro-best");
-  $("title-best").textContent = best ? `이 브라우저 최단 완료 · ${best.timeMode ? formatMetric(best.deliveryMinute, "시각") : best.completedDay + "일차"}`
-    : legacy ? `이전 10일판 최고 기록 · ${legacy.score}점 · ${legacy.ending}` : "";
+  $("title-best").textContent = bests.length ? bests.join(" · ") :
+    legacy ? `이전 10일판 최고 기록 · ${legacy.score}점 · ${legacy.ending}` : "";
 }
 
 $("btn-start").onclick = async () => {
@@ -1309,10 +1354,46 @@ $("intro-start-agent").onclick = () => {
   $("intro-title").focus({ preventScroll: true });
   playIntro(startTravel);
 };
-$("btn-gotowork").onclick = () => enterOffice();
-$("btn-skip-intro").onclick = () => enterOffice();
+let modeSpeech;
+
+function showModePicker() {
+  $("mode-form").reset();
+  $("mode-confirm").disabled = true;
+  for (const field of $("mode-form").elements) if (field.type === "radio") field.disabled = false;
+  show("screen-mode");
+  $("mode-title").focus({ preventScroll: true });
+  $("mode-dialogue").replaceChildren();
+  modeSpeech?.abort();
+  modeSpeech = new AbortController();
+  dialogueLine($("mode-dialogue"), officeCopy("modeAsk"), { voice: "ai", signal: modeSpeech.signal });
+}
+
+$("mode-form").onchange = () => { $("mode-confirm").disabled = false; };
+$("mode-form").onsubmit = async event => {
+  event.preventDefault();
+  if ($("mode-confirm").disabled) return;
+  const mode = new FormData(event.currentTarget).get("mode");
+  if (!isPlayMode(mode)) return;
+  $("mode-confirm").disabled = true;
+  for (const field of event.currentTarget.elements) if (field.type === "radio") field.disabled = true;
+  const run = newRun(undefined, undefined, RULESET, mode);
+  if ($("relaxed-timer").checked) enableRelaxed(run);
+  saveLocal(RUN_KEY, { state: run });
+  modeSpeech?.abort();
+  $("mode-dialogue").replaceChildren();
+  await dialogueLine($("mode-dialogue"), officeCopy(mode === "assembly" ? "modeAssembly" : "modeReal"), { voice: "ai" });
+  if (Math.random() < .3) {
+    await pause(350);
+    $("mode-dialogue").replaceChildren();
+    await dialogueLine($("mode-dialogue"), officeCopy("modeCommon"), { voice: "ai" });
+  }
+  await pause(500);
+  enterOffice(true, run);
+};
+$("btn-gotowork").onclick = showModePicker;
+$("btn-skip-intro").onclick = showModePicker;
 $("btn-resume").onclick = () => enterOffice(true);
-$("btn-restart").onclick = () => enterOffice();
+$("btn-restart").onclick = showModePicker;
 $("name-form").onsubmit = (event) => {
   event.preventDefault();
   const input = $("player-name");
@@ -1358,6 +1439,7 @@ if (LOCAL_DEBUG) {
       taskTimer.flush();
       if (busy || !passWorkForDebug(state)) return;
       draft = null;
+      assemblyDraft = null;
       workDraft = null;
       if (state.ending) endRun();
       else renderOffice(true);
@@ -1379,6 +1461,7 @@ $("mission-delegate").onclick = () => {
   if (state.ending) return endRun();
   coworkerHelp.hidePopover();
   draft = null;
+  assemblyDraft = null;
   renderOffice(true);
 };
 $("challenge-help-open").onclick = () => {
@@ -1392,7 +1475,10 @@ syncOfficeSidebar();
 
 $("title-records").onclick = () => openRecords(lastRecord, title);
 $("ending-records").onclick = () => openRecords(lastRecord, () => showResult(lastRecord));
-initRecords(show, (message) => { $("ending-sync").textContent = message; });
+initRecords(show, (message) => { $("ending-sync").textContent = message; }, {
+  get: () => loadLocal(RUN_KEY),
+  resume: saved => enterOffice(true, undefined, saved),
+});
 initDialogueSound();
 await loadDialogueOverrides();
 title();

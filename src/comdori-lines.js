@@ -14,6 +14,7 @@ export const TUTORIAL_LINES = {
 };
 
 export const COMDORI_LINES = {
+  mobileDevice: { priority: 3, lines: ["2006년에는 해당 기기가 존재하지 않았습니다."] },
   burst: {
     priority: 5, cooldown: 0,
     lines: ["인간의 마감 직전 연산 능력이 급격히 상승했습니다."],

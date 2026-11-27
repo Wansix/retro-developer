@@ -1,4 +1,4 @@
-import { SURVIVAL_RULESET } from "./survival.js";
+import { MODE_RULESET, PLAY_MODES } from "./play-mode.js";
 
 export const TOTAL_DAYS = 30;
 export const FIRST_RULESET = 1;
@@ -13,7 +13,7 @@ export const FUNDAMENTALS_RULESET = 9;
 export const OFFICE_CLOCK_RULESET = 10;
 export const SATURDAY_SHIFT_RULESET = 11;
 export const PROJECT_WORKDAYS = 10;
-export const RULESET = SURVIVAL_RULESET;
+export const RULESET = MODE_RULESET;
 
 export const calendarDayForWorkday = (day, daysPerWeek = 5) => day + (7 - daysPerWeek) * Math.floor((day - 1) / daysPerWeek);
 export const workdayForCalendarDay = (day, daysPerWeek = 5) => day - (7 - daysPerWeek) * Math.floor((day - 1) / 7);
@@ -27,6 +27,8 @@ export const SCRUM_METRICS = [
 ];
 
 export const METRICS = [
+  ["mode", "업무 수행 방식", "모드"],
+  ["fastestWorkSeconds", "최단 코딩 업무 해결 시간", "초"],
   ["webSearches", "미래넷 자료 목록을 연 업무", "건"],
   ["webBlogs", "블로그 열람", "회"],
   ["webBoards", "게시판 열람", "회"],
@@ -71,6 +73,7 @@ export const METRICS = [
 export const CATEGORIES = {
   fastest: { label: "가장 이른 최종 납품 · 2주판", key: "deliveryMinute", order: "ASC", unit: "시각", clears: true, mode: "survival" },
   classicFastest: { label: "최단 프로젝트 완료 · 구버전", key: "completedDay", order: "ASC", unit: "일차", clears: true, mode: "legacy" },
+  fastestWork: { label: "최단 코딩 업무 해결 시간", key: "fastestWorkSeconds", order: "ASC", unit: "초" },
   fastJobs: { label: "최다 빠른 업무 완료 · 2주판", key: "fastJobs", order: "DESC", unit: "건" },
   negotiations: { label: "최다 협상 성공 · 2주판", key: "negotiations", order: "DESC", unit: "회" },
   burstSaved: { label: "버스트 최다 절약 · 2주판", key: "burstSaved", order: "DESC", unit: "분" },
@@ -98,6 +101,7 @@ export function formatSeconds(seconds) {
 }
 
 export function formatMetric(value, unit) {
+  if (unit === "모드") return PLAY_MODES[value] ?? PLAY_MODES.real_coding;
   if (unit === "분") return formatMinutes(value);
   if (unit === "초") return formatSeconds(value);
   if (unit === "시각") return value === null ? "미완료" : formatSeconds(value);
