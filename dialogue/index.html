@@ -3,15 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>옛날 개발자 · 대사 편집실</title>
-  <link rel="stylesheet" href="editor.css">
+  <title>옛날 개발자 · 대사 편집실과 문제은행</title>
+  <link rel="stylesheet" href="editor.css?v=2">
 </head>
 <body>
   <header class="workspace-header">
-    <h1>대사 편집실</h1>
+    <h1>옛날 개발자 자료실</h1>
     <a href="/" target="_blank" rel="noopener">게임 미리보기 ↗</a>
   </header>
-  <main>
+  <nav class="workspace-tabs" aria-label="자료실 메뉴">
+    <a id="dialogue-tab" href="#dialogue" aria-current="page">대사 편집실</a>
+    <a id="problems-tab" href="#problems">문제은행</a>
+  </nav>
+  <main id="dialogue-panel">
     <section class="browser" aria-labelledby="list-title">
       <h2 id="list-title">상황별 대사</h2>
       <label for="search">대사·상황·캐릭터 검색</label>
@@ -42,6 +46,31 @@
       <p id="status" role="status"></p>
     </section>
   </main>
+  <main id="problems-panel" hidden>
+    <section class="browser problem-filters" aria-labelledby="problem-filters-title">
+      <h2 id="problem-filters-title">문제 찾기</h2>
+      <label for="problem-search">문제 제목·개념 검색</label>
+      <input id="problem-search" type="search" placeholder="예: 반복문, 상품, 정렬">
+      <label for="problem-difficulty">난이도</label>
+      <select id="problem-difficulty"><option value="">전체</option></select>
+      <label for="problem-day">배정 시점</label>
+      <select id="problem-day"><option value="">전체</option></select>
+      <label for="problem-language">코드 언어</label>
+      <select id="problem-language"></select>
+    </section>
+    <section class="editor problem-browser" aria-labelledby="problem-title">
+      <h2 id="problem-title">문제은행</h2>
+      <p class="bank-note">12근무일 새 게임 기준입니다. 배정 시점은 각 문제가 처음 배정될 수 있는 날이며, 미완료 업무는 이후 근무일로 이월됩니다. 퀴즈와 테스트 예시는 회차마다 달라질 수 있습니다.</p>
+      <details id="problem-schedule">
+        <summary>12근무일 출제표 보기</summary>
+        <ol id="problem-schedule-days"></ol>
+        <p class="bank-note">일요일은 휴식일입니다. 구버전에서 시작한 회차는 당시 출제표를 따릅니다.</p>
+      </details>
+      <p id="problem-count" role="status"></p>
+      <div id="problem-results"></div>
+    </section>
+  </main>
   <script type="module" src="editor.js"></script>
+  <script type="module" src="problems.js"></script>
 </body>
 </html>

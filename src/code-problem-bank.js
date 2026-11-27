@@ -19,10 +19,12 @@ export function problemOrder(seed) {
   });
 }
 
+export const problemKeys = difficulty => CODE_PROBLEMS.filter(problem => problem.difficulty === difficulty)
+  .map(problem => "code:" + problem.id);
+
 export function problemDeck(seed) {
   return Object.keys(DIFFICULTIES).map((difficulty, index) =>
-    seededShuffle(CODE_PROBLEMS.filter(problem => problem.difficulty === difficulty)
-      .map(problem => "code:" + problem.id), seed, 712 + index * 53));
+    seededShuffle(problemKeys(difficulty), seed, 712 + index * 53));
 }
 
 function pythonLiteral(value) {

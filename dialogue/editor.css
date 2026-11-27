@@ -39,3 +39,22 @@ footer { border-top: 1px solid #d0cdbb; padding-top: .75rem; }
   main { grid-template-columns: 1fr; }
   #results { max-height: 23vh; }
 }
+main[hidden] { display: none; }
+.workspace-tabs { display: flex; gap: .3rem; max-width: 1240px; margin: .75rem auto 0; padding: 0 1rem; }
+.workspace-tabs a { padding: .52rem .8rem; border: 1px solid #a7ad96; background: #f1efe2; color: #293f31; text-decoration: none; }
+.workspace-tabs a[aria-current="page"] { background: #3e5838; color: #fff; border-color: #3e5838; }
+.bank-note { color: #455343; font-size: .86rem; line-height: 1.5; }
+#problem-schedule { border: 1px solid #bdb7a2; padding: .55rem .7rem; background: #f4f0df; }
+summary { cursor: pointer; }
+#problem-schedule-days { margin: .6rem 0; padding: 0; list-style: none; }
+#problem-schedule-days li { display: flex; align-items: baseline; gap: .45rem; padding-block: .2rem; font-size: .86rem; }
+#problem-schedule-days button { flex: 0 0 auto; padding-block: .28rem; }
+#problem-count { font-size: .85rem; }
+.problem-group h3 { margin: 1rem 0 .35rem; border-bottom: 1px solid #c5c8b6; padding-bottom: .25rem; font-size: 1rem; }
+.problem-card { margin-block: .3rem; border: 1px solid #bdc3af; background: #fffdf4; }
+.problem-card summary { padding: .5rem .6rem; overflow-wrap: anywhere; }
+.problem-time { display: block; margin-top: .23rem; color: #405339; font-size: .83rem; }
+.problem-detail { padding: .05rem .7rem .5rem; line-height: 1.45; }
+.problem-detail h4 { margin: .65rem 0 .3rem; }
+.problem-detail pre { padding: .55rem; border: 1px solid #d3d3c0; overflow: auto; background: #f0f1e7; font: .82rem/1.45 monospace; }
+@media (max-width: 550px) { #problem-schedule-days li { display: grid; gap: .2rem; grid-template-columns: minmax(0, 1fr); } #problem-schedule-days button { justify-self: start; } }

@@ -22,8 +22,10 @@ export const stressPenalty = stress => stress >= 90 ? 20 : stress >= 75 ? 10 : s
 
 const workMinutes = mission => mission.minutes ?? (mission.id === "hello-world" ? 30 : 65);
 
+export const standardTaskMinutes = mission => Math.max(15, Math.round(workMinutes(mission) / 5) * 5);
+
 export function timePromises(state, mission) {
-  const estimate = Math.max(15, Math.round(workMinutes(mission) / 5) * 5);
+  const estimate = standardTaskMinutes(mission);
   const buffered = state.stats.reportTrust >= SURVIVAL.meetingTrust.high || state.scope >= 2;
   return [
     { id: "promise-short", minutes: Math.min(45, Math.ceil(estimate * .6 / 5) * 5), reputation: 3 },

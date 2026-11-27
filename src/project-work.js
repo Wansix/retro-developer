@@ -1,5 +1,5 @@
 import { hasSurvival, SURVIVAL } from "./survival.js";
-import { problemDeck } from "./code-problem-bank.js";
+import { problemDeck, problemKeys } from "./code-problem-bank.js";
 import { FUNDAMENTAL_DAYS } from "./code-fundamentals.js";
 import { seedValue, seededShuffle } from "./seeded.js";
 
@@ -7,31 +7,47 @@ export const OPENING_WORK = "story:opening";
 export const DEPLOYMENT_WORK = "story:deployment";
 export const PROJECT_GOAL = { work: 16, score: 270, deploymentDay: 8 };
 
+const WORK_POOLS = {
+  knowledge: ["quiz", "review"],
+  legacy: ["sudoku", "memory"],
+  operations: ["lights", "qa", "design"],
+};
+const fundamentalsForDay = (day, index) => FUNDAMENTAL_DAYS[day - 1][index].map(problem => "code:" + problem.id);
+
+export const SURVIVAL_WORK_SLOTS = [
+  { day: 1, pool: "knowledge", index: 0, afterLunch: true },
+  { day: 2, pool: "fundamentals", index: 0 },
+  { day: 2, pool: "fundamentals", index: 1 },
+  { day: 3, pool: "fundamentals", index: 0 },
+  { day: 3, pool: "fundamentals", index: 1 },
+  { day: 4, pool: "intermediate", index: 0 },
+  { day: 4, pool: "legacy", index: 0 },
+  { day: 5, pool: "legacy", index: 1 },
+  { day: 6, pool: "knowledge", index: 1 },
+  { day: 7, pool: "intermediate", index: 1 },
+  { day: 8, pool: "operations", index: 0 },
+  { day: 9, pool: "advanced", index: 0 },
+  { day: 10, pool: "operations", index: 1 },
+  { day: 11, pool: "advanced", index: 1 },
+];
+
+export function survivalSlotCandidates({ day, pool, index }) {
+  if (pool === "fundamentals") return fundamentalsForDay(day, index);
+  return WORK_POOLS[pool] ?? problemKeys(pool);
+}
+
 export function projectWorkDeck(seed, fundamentals = false, fullFirstDay = false, survival = false) {
   const [beginner, intermediate, advanced] = problemDeck(seed);
-  const [first, second] = seededShuffle(["quiz", "review"], seed, 746);
-  const [third, fourth] = seededShuffle(["sudoku", "memory"], seed, 747);
-  const [fifth, sixth, seventh] = seededShuffle(["lights", "qa", "design"], seed, 748);
+  const [first, second] = seededShuffle(WORK_POOLS.knowledge, seed, 746);
+  const [third, fourth] = seededShuffle(WORK_POOLS.legacy, seed, 747);
+  const [fifth, sixth, seventh] = seededShuffle(WORK_POOLS.operations, seed, 748);
   if (survival) {
-    const fundamentalsAt = (day, slot) => "code:" + FUNDAMENTAL_DAYS[day][slot][
-      seedValue(seed, 874 + day * 3 + slot) % FUNDAMENTAL_DAYS[day][slot].length
-    ].id;
-    return [
-      { day: 1, key: first, afterLunch: true },
-      { day: 2, key: fundamentalsAt(1, 0) },
-      { day: 2, key: fundamentalsAt(1, 1) },
-      { day: 3, key: fundamentalsAt(2, 0) },
-      { day: 3, key: fundamentalsAt(2, 1) },
-      { day: 4, key: intermediate[0] },
-      { day: 4, key: third },
-      { day: 5, key: fourth },
-      { day: 6, key: second },
-      { day: 7, key: intermediate[1] },
-      { day: 8, key: fifth },
-      { day: 9, key: advanced[0] },
-      { day: 10, key: sixth },
-      { day: 11, key: advanced[1] },
-    ];
+    const selections = { knowledge: [first, second], legacy: [third, fourth], operations: [fifth, sixth, seventh], intermediate, advanced };
+    return SURVIVAL_WORK_SLOTS.map(({ day, pool, index, afterLunch }) => {
+      const choices = pool === "fundamentals" ? fundamentalsForDay(day, index) : selections[pool];
+      const key = pool === "fundamentals" ? choices[seedValue(seed, 874 + (day - 1) * 3 + index) % choices.length] : choices[index];
+      return { day, key, ...(afterLunch ? { afterLunch: true } : {}) };
+    });
   }
   const early = fundamentals
     ? FUNDAMENTAL_DAYS.map((slots, day) => [day + 1, slots.map((pool, slot) =>
