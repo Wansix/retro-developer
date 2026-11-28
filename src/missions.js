@@ -190,13 +190,13 @@ export const WRONG_RUN_LINES = [
 export const PROLOGUE_2026 = [
   { id: "0", who: "me", text: "지금 로그인 화면부터 띄워줘." },
   { id: "1", who: "ai", text: "현재 로그인 화면입니다.", preview: "baseline" },
-  { id: "2", who: "me", text: "로그인 실패 문구만 버튼 바로 밑에 띄워줘. 디자인은 그대로 둬." },
-  { id: "login-fixed", who: "ai", text: "수정 완료했습니다. 테스트는 12개 통과했습니다. 로그인 버튼을 눌러 확인해 주세요.",
+  { id: "2", who: "me", text: "로그인 기능 구현해 줘." },
+  { id: "login-fixed", who: "ai", text: "로그인 기능을 구현했습니다. 테스트는 12개 통과했습니다. 로그인 버튼을 눌러 확인해 주세요.",
     tools: [
-      { command: "npm test -- login.test.ts", output: "PASS  src/auth/login.test.ts\nTests: 12 passed, 12 total", tone: "pass" },
+      { command: "npm test -- login.test.ts", output: "PASS  src/auth/login.test.ts\n✓ 올바른 계정 정보로 로그인 요청을 처리한다\nTests: 12 passed, 12 total", tone: "pass" },
     ] },
-  { id: "11", who: "check", target: "login", preview: "sessionError", text: "에이전트 말대로 로그인 눌러보기" },
-  { id: "login-complaint", who: "me", text: "이거 아니잖아. 로그인 눌렀는데 또 로그인하래. 그냥 내가 하는 게 빠르겠다." },
+  { id: "11", who: "check", target: "login", preview: "loginError", text: "로그인해서 접속되는지 확인하기" },
+  { id: "login-complaint", who: "me", text: "이거 아니잖아. 로그인 눌렀더니 에러가 뜨는데? 그냥 내가 하는 게 빠르겠다." },
   { id: "button-defense", who: "ai", text: "버튼은 정상 작동했습니다." },
   { id: "16", who: "ai", text: "직접 개발하시는 편이 더 효율적이라고 생각하시나요?" },
   { id: "17", who: "me", text: "당연하지! 옛날 개발자들은 너 같은 거 없이도 다 만들었어!" },

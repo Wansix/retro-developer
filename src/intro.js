@@ -29,7 +29,7 @@ export function playIntro(onDone) {
 
   function showPreview(state) {
     error.hidden = true;
-    if (state === "sessionError") previewFeedback("로그인 화면으로 돌아왔어요. 다시 로그인해 주세요.", "fail");
+    if (state === "loginError") previewFeedback("TypeError: Cannot read properties of undefined (reading 'id')", "fail");
   }
 
   login.onclick = () => {
@@ -76,7 +76,7 @@ export function playIntro(onDone) {
         if (checking) {
           showPreview(step.preview);
           append("↳", "output", `미리보기 · ${error.textContent}`).dataset.tone = error.dataset.tone;
-          if (step.preview === "sessionError" && !reducedMotion.matches) {
+          if (step.preview === "loginError" && !reducedMotion.matches) {
             workbench.animate([
               { transform: "translateX(0)" },
               { transform: "translateX(-8px)", offset: .25 },

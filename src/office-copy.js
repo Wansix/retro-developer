@@ -47,7 +47,7 @@ export const OFFICE_COPY = {
   firstPassed: ["첫 업무 검수 통과", "boss", "첫 검수 통과야. 손 좀 풀렸으면 다음 일도 하나 줄게."],
   firstHint: ["첫 업무에서 이 대리의 자료를 요청", "boss", "이 대리가 참고할 글 줬지? 예제 한번 보고 와."],
   firstTask: ["첫 업무 · Hello, World!", "boss", "신입, Hello, World! 한 줄 찍어 봐. 나도 첫날엔 이거부터 했어."],
-  openingThought: ["2026년 프롤로그 · 게임 시작 버튼", "me", "로그인 오류 문구 하나만 고치면 퇴근이다. 컴돌이한테 맡겨 볼까?"],
+  openingThought: ["2026년 프롤로그 · 게임 시작 버튼", "me", "로그인 기능만 구현하면 퇴근이다. 컴돌이한테 맡겨 볼까?"],
   openingAgent: ["2026년 프롤로그 · 에이전트 연결", "ai", "어떤 작업을 할까요?"],
   bankMission: ["코딩 문제은행 업무 배정", "boss", "신입, ‘{title}’ 건이야. 작업 범위는 편집기 옆에 적어 뒀어."],
   miniMission: ["퀴즈·퍼즐 업무 배정", "boss", "신입, ‘{title}’ 건 받았지? 기준 보고 한번 검수해 줘."],
