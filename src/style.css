@@ -329,6 +329,20 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   .intro-terminal { min-height: 0; }
   .intro-preview-toolbar { padding-block: .45rem; }
   .intro-preview-login { margin-block: .45rem; padding-block: .55rem; }
+  .intro-workbench:has(#intro-preview-login:disabled) :is(.intro-preview-toolbar, .intro-preview-field, #intro-preview-login, .intro-workspace code) {
+    display: none;
+  }
+  .intro-workbench:has(#intro-preview-login:disabled) .intro-preview-login {
+    gap: .25rem;
+    width: 100%;
+    margin: 0;
+    padding: .55rem .65rem;
+    border: 0;
+    border-radius: 0;
+  }
+  .intro-workbench:has(#intro-preview-login:disabled) #intro-transcript { padding-block: .55rem; }
+  .intro-workbench:has(#intro-preview-login:disabled) .intro-row { margin-block: .3rem; }
+  .intro-workbench:has(#intro-preview-login:disabled) .intro-row p { word-break: keep-all; }
 }
 
 /* ============ 메인 게임 ============ */

@@ -36,8 +36,8 @@ export function playIntro() {
     append("나", "openingTakeover");
     append("컴돌이", "openingTravel");
     status.textContent = "2006년 · 미래소프트 개발 3팀";
-    transcript.scrollTop = transcript.scrollHeight;
     startWork.classList.remove("hidden");
+    transcript.scrollTop = transcript.scrollHeight;
     startWork.focus({ preventScroll: true });
   };
 }
