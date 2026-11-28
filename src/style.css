@@ -438,6 +438,17 @@ h2 { color: #8fd05a; font-size: 1.1rem; margin: 0.5rem 0; }
   .intro-terminal { height: auto; min-height: 0; }
   .intro-preview-toolbar, .intro-shop-nav { padding-block: .45rem; }
   .intro-preview-login { margin-block: .45rem; padding-block: .55rem; }
+  .intro-preview:has(#intro-preview-error:not([hidden])) :is(.intro-preview-toolbar, .intro-shop-nav, .intro-preview-field, #intro-preview-login) {
+    display: none;
+  }
+  .intro-preview:has(#intro-preview-error:not([hidden])) .intro-preview-login {
+    width: 100%;
+    margin: 0;
+    padding: .55rem .65rem;
+    gap: .25rem;
+    border: 0;
+    border-radius: 0;
+  }
 }
 
 /* 시간 이동 */
