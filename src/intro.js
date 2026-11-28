@@ -121,7 +121,12 @@ export function playIntro(onDone) {
     });
   }
 
-  async function replyToPlayer(text) {
+  async function replyToPlayer(text, instant = false) {
+    if (instant) {
+      append("컴돌이", "reply", text);
+      comdori.dataset.action = "idle";
+      return;
+    }
     comdori.dataset.action = "talking";
     const reply = append("컴돌이", "reply");
     await dialogueLine(reply, text, { voice: "ai", onFrame: latest });
@@ -137,17 +142,23 @@ export function playIntro(onDone) {
     status.dataset.activity = "";
     await replyToPlayer(officeCopy("openingAgent"));
     for (const step of editedScript("intro", PROLOGUE_2026)) {
+      if (step.automatic) {
+        append("나", "prompt", step.text);
+        continue;
+      }
       if (step.who === "me" || step.who === "check") {
         await waiting(step);
         continue;
       }
-      await pause(180);
-      if (step.before) await replyToPlayer(step.before);
+      if (!step.instant) await pause(180);
+      if (step.before) await replyToPlayer(step.before, step.instant);
       if (step.tools?.length) comdori.dataset.action = "working";
       for (const { command, output, tone } of step.tools ?? []) {
-        const line = append("$", "tool");
-        await dialogueLine(line, command, { voice: "terminal", maxMs: 620, letterMs: 14, onFrame: latest });
-        await pause(100);
+        const line = append("$", "tool", step.instant ? command : "");
+        if (!step.instant) {
+          await dialogueLine(line, command, { voice: "terminal", maxMs: 620, letterMs: 14, onFrame: latest });
+          await pause(100);
+        }
         const result = append("↳", "output", tone === "diff" ? "" : output);
         if (tone === "diff") {
           for (const text of output.split("\n")) {
@@ -158,11 +169,11 @@ export function playIntro(onDone) {
           }
           latest();
         } else if (tone) result.dataset.tone = tone;
-        await pause(80);
+        if (!step.instant) await pause(80);
       }
       const revealPreview = step.preview && preview.classList.contains("hidden");
       if (step.preview && !revealPreview) showPreview(step.preview);
-      if (step.text) await replyToPlayer(step.text);
+      if (step.text) await replyToPlayer(step.text, step.instant);
       if (revealPreview) {
         showPreview(step.preview);
         preview.classList.remove("hidden");

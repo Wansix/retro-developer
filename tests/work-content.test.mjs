@@ -394,6 +394,39 @@ test("the first shift uses the full schedule and only unlocks the afternoon assi
   assert.equal(run.scrum.yesterday.workCount, 4);
 });
 
+test("first-day report shows the skipped time and actual assignment status before the leave choice", () => {
+  const run = newRun(3);
+  step(run, "stack-none", "arrive", "promise-standard");
+  assert.ok(submitSolution(run));
+  step(run, "next", "rest");
+
+  const reportChoice = (state) => options(state).find(({ id }) => id === "next");
+  assert.match(reportChoice(run).detail, /완료 1건 · 미배정 ‘상점 관리자 매뉴얼 확인’.*4시간 15분.*정시 퇴근이나 야근/);
+  const unassigned = structuredClone(run);
+  step(unassigned, "next");
+  assert.equal(officeTime(unassigned), "17:15");
+  assert.match(options(unassigned)[0].label, /완료 1건과 남은 업무/);
+  step(unassigned, "reportBrief");
+  assert.match(unassigned.effects[0], /완료 1건 · 미배정/);
+  assert.deepEqual(options(unassigned).map(({ id }) => id), ["leave", "stay"]);
+
+  step(run, "nextWork", "promise-standard");
+  assert.equal(currentMission(run).title, "고객 문의 순번");
+  assert.match(reportChoice(run).detail, /배정 후 미완료 ‘고객 문의 순번’/);
+  const unfinished = structuredClone(run);
+  step(unfinished, "next", "reportBrief");
+  assert.match(unfinished.effects[0], /완료 1건 · 배정 후 미완료/);
+
+  assert.equal(submitSpecialWork(run, 1).passed, true);
+  assert.match(reportChoice(run).detail, /완료 2건 · 남은 업무 없음.*3시간 52분/);
+  step(run, "next");
+  assert.equal(options(run)[0].label, "완료 2건 보고 후 퇴근 선택");
+  step(run, "reportBrief");
+  assert.match(run.effects[0], /완료 2건 · 남은 업무 없음/);
+  step(run, "leave");
+  assert.equal(run.shift, 2);
+});
+
 test("unsubmitted work carries over the lunch break and Friday reserves enough time for the project meeting", () => {
   const run = newRun(417, undefined, SATURDAY_SHIFT_RULESET);
   step(run, "stack-none", "arrive");

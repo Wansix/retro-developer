@@ -186,8 +186,8 @@ export const WRONG_RUN_LINES = [
   "이대로 QA에 넘기면 다시 돌아온다. 이제 입력이랑 결과를 나란히 놓고 봐.",
 ];
 
-// 프롤로그 2026년: who 'me'는 플레이어가 직접 누르는 대사 버튼, 'ai'는 자동 진행.
-// logs는 해당 시점에 위쪽 에이전트 터미널에 타이핑되는 작업 로그.
+// 프롤로그 2026년: 'me'는 자동 대사(automatic)를 제외하면 플레이어 입력, 'check'는 미리보기 테스트.
+// instant가 지정된 'ai' 단계는 작업 로그와 답변을 즉시 표시한다.
 export const PROLOGUE_2026 = [
   { who: "me", text: "지금 로그인 화면부터 띄워줘." },
   { who: "ai", text: "현재 로그인 화면입니다.", preview: "baseline" },
@@ -205,23 +205,23 @@ export const PROLOGUE_2026 = [
       { command: "git status --short", output: "(변경된 파일 없음)" },
     ] },
   { who: "me", text: "장바구니 수정은 내가 한 거야. 그것까지 날리면 어떡해?" },
-  { who: "ai", text: "죄송합니다. 로그인 수정부터 다시 적용하겠습니다.",
+  { who: "ai", instant: true, text: "죄송합니다. 로그인 수정부터 다시 적용하겠습니다.",
     tools: [
       { command: "git diff -- src/auth/login.ts", output: "- return createSession(account.id);\n+ return createSession(account.id, { rememberMe: true });", tone: "diff" },
     ] },
-  { who: "ai", text: "이제 버튼 아래에 오류가 표시됩니다. 참고로 기존 기능 3개가 작동하지 않습니다.", preview: "regression",
+  { who: "ai", instant: true, text: "이제 버튼 아래에 오류가 표시됩니다. 참고로 기존 기능 3개가 작동하지 않습니다.", preview: "regression",
     tools: [
       { command: "npm test", output: "FAIL  cart/coupon.test.ts\nFAIL  auth/logout.test.ts\nFAIL  api/profile.test.ts\nTests: 3 failed, 12 passed", tone: "fail" },
     ] },
-  { who: "me", text: "잠깐, 로그인은 진짜 된 거 맞아? 내가 이대로 확인하면 돼?" },
-  { who: "ai", text: "네. 로그인 버튼을 눌러 성공 문구가 뜨면 로그인도 정상입니다. 바로 내 계정을 열어도 됩니다.",
+  { who: "me", automatic: true, text: "잠깐, 로그인은 진짜 된 거 맞아? 내가 이대로 확인하면 돼?" },
+  { who: "ai", instant: true, text: "네. 로그인 버튼을 눌러 성공 문구가 뜨면 로그인도 정상입니다. 바로 내 계정을 열어도 됩니다.",
     tools: [
       { command: "npm test -- login.test.ts", output: "PASS  성공 문구가 표시된다", tone: "pass" },
     ] },
   { who: "check", target: "login", preview: "falseSuccess", text: "에이전트 말대로 로그인 눌러보기" },
   { who: "check", target: "account", preview: "sessionError", text: "내 계정 열어보기" },
   { who: "me", text: "이거 아니잖아. 로그인됐다면서 내 계정 누르니까 또 로그인하래." },
-  { who: "ai", before: "네, 맞습니다. 죄송합니다! 성공 문구만 확인하고 실제 로그인도 된다고 잘못 말씀드렸습니다.",
+  { who: "ai", instant: true, before: "네, 맞습니다. 죄송합니다! 성공 문구만 확인하고 실제 로그인도 된다고 잘못 말씀드렸습니다.",
     text: "이제 내 계정까지 열리는 걸 확인했습니다.", preview: "repaired",
     tools: [
       { command: "npm run test:e2e -- login", output: "FAIL  내 계정으로 이동하면 로그인 화면으로 돌아간다", tone: "fail" },

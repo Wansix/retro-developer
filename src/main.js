@@ -8,7 +8,7 @@ import { DEPARTMENTS, ENDINGS, EPILOGUE } from "./office-content.js";
 import { CAST_NAMES, editedScene, officeScene } from "./office-scenes.js";
 import {
   CLEANUP_MINUTES, CODE_DELEGATION, CODE_REVIEW_MINUTES, DEBUG_PASS_MOVE, PHASES, RELATION_NAMES, act, canDelegateCode, canReviewCode,
-  canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, failPracticeRun, hasDirectAssignments,
+  canSubmit, codingCost, currentMission, delegateCodeWork, failCodeSubmission, failPracticeRun, firstDayReportSummary, hasDirectAssignments,
   hasChainedWork, hasLanguageAssignment, hasOfficeClock, hasProblemBank, hasSaturdayShift, hasShortProject, hasWorkContent, isCoding, isFriday, isHalfDay, isTutorial, missionCount,
   markMobileFinish, missionNotice, needsAssignment, newRun, nextAssignment, officeTime, options, passWorkForDebug, projectDay, recordFor, recordPaste, requestCodeReview,
   submitSolution, submitSpecialWork, deferWork, enableRelaxed, taskIsOpen, useBurst, useInternet,
@@ -548,7 +548,8 @@ function hud() {
       node.textContent = learning ? "13:00  오후 업무" : "협상 후  오후 업무";
       visible = fullDay;
     }
-    if (step === "report") node.textContent = officeTime(state, "report") + (fullDay && isFriday(state.day) ? "  프로젝트 회의" : "  진행 보고");
+    if (step === "report") node.textContent = officeTime(state, "report") +
+      (fullDay && isFriday(state.day) ? "  프로젝트 회의" : fullDay && learning ? "  일과 마감 보고" : "  진행 보고");
     if (step === "leave") node.textContent = officeTime(state, "leave") + "  퇴근";
     if (step === "assign") {
       node.textContent = state.scrum ? "스크럼 후  업무 배분" : "09:30  업무 배분";
@@ -613,7 +614,9 @@ function phaseStory() {
           if (isHalfDay(state)) return `${budget} 토요일 배정분을 마쳤다. 정오까지 남은 일정을 정리한다.`;
           return `${budget} 오전 배정분을 마쳤다. ${isTutorial(state) ? "점심을 먹고 오후 업무를 받을 수 있다." : "점심시간까지 남은 일정을 정리한다."}`;
         }
-        if (fullDay && phase === "afternoon") return `${budget} 오늘 배정분을 마쳤다. 남은 시간을 넘기고 진행 상황을 보고할 수 있다.`;
+        if (fullDay && phase === "afternoon") {
+          return `${budget} 오늘 배정분을 마쳤다.${isTutorial(state) ? "" : " 남은 시간을 넘기고 진행 상황을 보고할 수 있다."}`;
+        }
         return `${budget} 오늘 배정분을 마쳤다.${state.shift < projectDay(state, state.deadline) ? " 새 업무는 내일 들어온다." : ""}`;
       }
       if (!mission) return `${budget} 필수 기능 검수가 끝났다. 남은 추가 일감을 정리하고 퇴근하면 배포할 수 있다.`;
@@ -645,7 +648,10 @@ function phaseStory() {
       return `현재 관계 ${state.relations[state.department]} · 요청 수락 시 오후 ${formatMinutes(state.request[2])} 소요`;
     }
     case "report":
-      if (fullDay && isTutorial(state)) return `오늘 완료한 업무 ${state.workDoneToday}건을 김 과장에게 보고한다.`;
+      if (fullDay && isTutorial(state)) {
+        $("shift-title").textContent = "첫날 일과 마감 보고";
+        return firstDayReportSummary(state) + ".";
+      }
       if (isFriday(state.day)) {
         $("shift-title").textContent = "금요일 전체 프로젝트 회의";
         return "기획팀은 기능 추가, 디자인팀은 시안 수정, 영업팀은 납품일 단축을 요구한다. QA팀은 검수 시간이 필요하다.";
@@ -657,7 +663,7 @@ function phaseStory() {
         state.deliverySubmitted ? "검수 합격. 고객사에 납품 메일을 보냈다." :
           "11시 55분. 김 과장이 점심 얘기를 꺼냈다. 오전에 돌아갈지, 남아서 일을 끝낼지 고른다." :
         "토요일 오전 근무를 마쳤다. 남은 업무는 월요일에 이어서 한다.";
-      if (isTutorial(state)) return "남은 업무는 다음 출근 때 이어서 할 수 있다.";
+      if (isTutorial(state)) return "정시 퇴근할지, 남아서 야근할지 고른다.";
       return hasChainedWork(state) ? projectStatus() : "김 과장이 벽시계를 한 번 보고 자리에 앉는다.";
     }
   }
@@ -864,7 +870,8 @@ function renderCoding() {
   $("code-debug-pass").disabled = busy || !canSubmit(state);
   const missing = cost - state.remaining;
   const next = submissionNextAction(options(state));
-  const followup = isHalfDay(state) ? (hasSurvival(state) ? "정오 퇴근 준비에서 추가 근무를 고를 수 있어요." : "정오에 퇴근한 뒤 월요일에 이어서 할 수 있어요.")
+  const followup = next?.id === "next" && isTutorial(state) && state.phase === "afternoon" ? next.detail
+    : isHalfDay(state) ? (hasSurvival(state) ? "정오 퇴근 준비에서 추가 근무를 고를 수 있어요." : "정오에 퇴근한 뒤 월요일에 이어서 할 수 있어요.")
     : isTutorial(state) && !hasOfficeClock(state) && state.phase === "morning"
     ? "퇴근 준비 후 야근을 선택하거나 다음 출근에 이어서 할 수 있어요."
     : next?.id === "prepare"
@@ -905,8 +912,10 @@ function renderWorkChallenge() {
   $("challenge-submit").textContent = `업무 제출 · ${formatMinutes(cost)}`;
   $("challenge-submit").disabled = !canSubmit(state);
   $("challenge-debug-pass").disabled = !canSubmit(state);
-  $("challenge-status").textContent = state.remaining < cost ? `남은 시간 ${formatMinutes(state.remaining)} · 제출에 ${formatMinutes(cost)} 필요` : "";
   const next = submissionNextAction(options(state));
+  $("challenge-status").textContent = state.remaining < cost ?
+    `남은 시간 ${formatMinutes(state.remaining)} · 제출에 ${formatMinutes(cost)} 필요` +
+      (next?.id === "next" && isTutorial(state) && state.phase === "afternoon" ? `. ${next.detail}` : "") : "";
   $("challenge-next").classList.toggle("hidden", !next);
   $("challenge-next").textContent = next?.label ?? "";
   $("challenge-next").onclick = next ? () => takeOfficeAction(next.id) : null;
@@ -924,7 +933,6 @@ function submitChallenge(answer) {
     if (!canSubmit(state)) $("challenge-feedback").textContent = "업무 시간이 부족해요. 다음 근무 시간에 이어서 할 수 있어요.";
     return;
   }
-  presence.work();
   if (result.passed) workDraft = null;
   if (state.ending) return endRun();
   if (result.passed) {

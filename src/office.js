@@ -656,6 +656,29 @@ function choice(id, label, detail = "", disabled = false) {
   return { id, label, detail, disabled };
 }
 
+export function firstDayReportSummary(s) {
+  const active = currentMission(s);
+  const offered = nextAssignment(s);
+  const parts = [`완료 ${s.workDoneToday}건`];
+  if (active) parts.push(`배정 후 미완료 ‘${active.title}’`);
+  if (offered) parts.push(`미배정 ‘${offered.notice ?? offered.title}’`);
+  if (s.scope) parts.push(`남은 추가 일감 ${s.scope}건`);
+  if (parts.length === 1) parts.push("남은 업무 없음");
+  return parts.join(" · ");
+}
+
+function firstDayReportChoice(s) {
+  const time = s.remaining ? `남은 정규 업무 시간 ${formatMinutes(s.remaining)}을 넘깁니다.` : "남은 정규 업무 시간이 없습니다.";
+  return choice("next", "오후 업무 마감하고 보고하기",
+    `${firstDayReportSummary(s)}. ${time} 보고 후 정시 퇴근이나 야근을 선택합니다.`);
+}
+
+function briefReportMinutes(s) {
+  if (!hasSurvival(s)) return 15;
+  if (s.stats.reportTrust >= SURVIVAL.meetingTrust.high) return 5;
+  return s.stats.reportTrust <= SURVIVAL.meetingTrust.low ? 30 : 15;
+}
+
 export function needsAssignment(s) {
   if (hasChainedWork(s)) return !isTutorial(s) && !s.activeWork && !!nextAssignment(s);
   if (hasWorkContent(s)) return !isTutorial(s) && !!currentMission(s);
@@ -816,8 +839,9 @@ export function options(s) {
           ...(s.scope && s.phase !== "morning" ? [choice("cleanup", "추가 일감 1건 정리",
             `시간 ${formatMinutes(CLEANUP_MINUTES)} · 인사평가 +4`, s.remaining < CLEANUP_MINUTES)] : []),
           ...(!isTutorial(s) && !s.coffee ? [choice("coffee", "커피 한 잔", "시간 25분 · 체력 +8 · 스트레스 −5", s.remaining < 25)] : []),
-          choice("next", s.phase === "overtime" ? "야근을 마치고 퇴근" : isHalfDay(s) ? "정오 퇴근 준비" : isTutorial(s) && !hasOfficeClock(s) ? "퇴근 준비" :
-            s.phase === "morning" ? "점심시간으로" : "진행 상황 보고"),
+          isTutorial(s) && s.phase === "afternoon" ? firstDayReportChoice(s) :
+            choice("next", s.phase === "overtime" ? "야근을 마치고 퇴근" : isHalfDay(s) ? "정오 퇴근 준비" : isTutorial(s) && !hasOfficeClock(s) ? "퇴근 준비" :
+              s.phase === "morning" ? "점심시간으로" : "진행 상황 보고"),
         ];
       }
       if (isTutorial(s)) {
@@ -858,7 +882,10 @@ export function options(s) {
           : "관계 +4 이상 필요 · 회의 15분", s.relations[s.department] < 4),
       ];
     case "report":
-      if (hasOfficeClock(s) && isTutorial(s)) return [choice("reportBrief", "첫날 업무를 보고한다", "보고 15분")];
+      if (hasOfficeClock(s) && isTutorial(s)) {
+        const remaining = s.activeWork || nextAssignment(s) || s.scope ? "과 남은 업무" : "";
+        return [choice("reportBrief", `완료 ${s.workDoneToday}건${remaining} 보고 후 퇴근 선택`, `보고 ${briefReportMinutes(s)}분`)];
+      }
       if (isFriday(s.day)) return [
         choice("yes", "네, 가능합니다."),
         choice("no", "물리적으로 불가능합니다."),
@@ -902,8 +929,9 @@ export function taskIsOpen(s) {
 function survivalWorkOptions(s) {
   const mission = currentMission(s);
   const budget = s.remaining;
-  const next = choice("next", s.phase === "overtime" ? "추가 근무를 마치고 퇴근" :
-    isHalfDay(s) ? "정오 퇴근 준비" : s.phase === "morning" ? "점심시간으로" : "진행 상황 보고");
+  const next = isTutorial(s) && s.phase === "afternoon" ? firstDayReportChoice(s) :
+    choice("next", s.phase === "overtime" ? "추가 근무를 마치고 퇴근" :
+      isHalfDay(s) ? "정오 퇴근 준비" : s.phase === "morning" ? "점심시간으로" : "진행 상황 보고");
   if (mission && !s.solvedToday && !s.task && budget >= codingCost(s)) {
     return timePromises(s, mission).map(({ id, minutes, reputation, inspection }) => choice(id,
       inspection ? "코드를 확인하고 일정을 약속한다" : `${formatMinutes(minutes)}을 약속한다`,
@@ -1158,12 +1186,12 @@ export function act(s, id) {
       if (isFriday(s.day)) handleBoss(s, id);
       else {
         const full = id === "reportFull";
-        const trusted = hasSurvival(s) && s.stats.reportTrust >= SURVIVAL.meetingTrust.high;
-        const watched = hasSurvival(s) && s.stats.reportTrust <= SURVIVAL.meetingTrust.low;
-        change(s, { meeting: full ? 45 : trusted ? 5 : watched ? 30 : 15, score: full ? 7 : 0 });
-        s.nextMeeting = full ? 30 : watched ? 15 : 0;
-        s.effects = [full ? "오늘 보고가 길어져 후속 회의가 내일 업무 시간 30분을 차지한다." : "회의록 한 줄을 남기고 자리에 돌아왔다."];
+        const minutes = full ? 45 : briefReportMinutes(s);
+        change(s, { meeting: minutes, score: full ? 7 : 0 });
+        s.nextMeeting = full ? 30 : minutes === 30 ? 15 : 0;
         s.phase = "leave";
+        s.effects = [isTutorial(s) && hasOfficeClock(s) ? `김 과장에게 보고했다. ${firstDayReportSummary(s)}.` :
+          full ? "오늘 보고가 길어져 후속 회의가 내일 업무 시간 30분을 차지한다." : "회의록 한 줄을 남기고 자리에 돌아왔다."];
       }
       break;
     case "leave":
