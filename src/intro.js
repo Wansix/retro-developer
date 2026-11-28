@@ -14,9 +14,11 @@ export function playIntro(onDone) {
   const speakText = document.getElementById("intro-speak-text");
   const speakAction = document.getElementById("intro-speak-action");
   const preview = document.getElementById("intro-preview");
+  const workbench = preview.closest(".intro-workbench");
   const login = document.getElementById("intro-preview-login");
   const error = document.getElementById("intro-preview-error");
   const desktop = matchMedia("(pointer: fine)").matches;
+  const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
   let previewAction;
 
   function previewFeedback(text, tone) {
@@ -74,6 +76,14 @@ export function playIntro(onDone) {
         if (checking) {
           showPreview(step.preview);
           append("↳", "output", `미리보기 · ${error.textContent}`).dataset.tone = error.dataset.tone;
+          if (step.preview === "sessionError" && !reducedMotion.matches) {
+            workbench.animate([
+              { transform: "translateX(0)" },
+              { transform: "translateX(-8px)", offset: .25 },
+              { transform: "translateX(8px)", offset: .5 },
+              { transform: "translateX(0)" },
+            ], { duration: 220, easing: "ease-out" });
+          }
         } else {
           append("나", "prompt", step.text);
         }

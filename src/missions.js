@@ -196,9 +196,12 @@ export const PROLOGUE_2026 = [
       { command: "npm test -- login.test.ts", output: "PASS  src/auth/login.test.ts\nTests: 12 passed, 12 total", tone: "pass" },
     ] },
   { id: "11", who: "check", target: "login", preview: "sessionError", text: "에이전트 말대로 로그인 눌러보기" },
-  { id: "login-complaint", who: "me", text: "이거 아니잖아. 로그인 눌렀는데 또 로그인하래." },
+  { id: "login-complaint", who: "me", text: "이거 아니잖아. 로그인 눌렀는데 또 로그인하래. 그냥 내가 하는 게 빠르겠다." },
   { id: "button-defense", who: "ai", text: "버튼은 정상 작동했습니다." },
-  { id: "takeover", who: "me", text: "됐어. 너 없던 시절처럼 내가 할게." },
+  { id: "16", who: "ai", text: "직접 개발하시는 편이 더 효율적이라고 생각하시나요?" },
+  { id: "17", who: "me", text: "당연하지! 옛날 개발자들은 너 같은 거 없이도 다 만들었어!" },
+  { id: "18", who: "ai", text: "그렇다면 직접 경험해 보시겠습니까?" },
+  { id: "19", who: "me", text: "그래! 차라리 그때가 낫겠다!" },
   { id: "20", who: "ai", text: "알겠습니다. 요청하신 개발 환경을 준비하겠습니다.",
     tools: [
       { command: "workspace switch --year 2006", output: "✓  2006년 개발 환경 준비 완료\n…  현재 세션 연결 종료 대기", tone: "warn" },
@@ -224,6 +227,6 @@ export const SCENE_2006 = [
   { who: "me", text: "잠깐, 모니터에 저거… 컴돌이?" },
   { who: "ai", text: "연결됐습니다. 지금은 2006년 3월입니다." },
   { who: "ai", text: "두 번째 토요일이 납품일입니다. 12근무일 안에 쇼핑몰을 완성하면 2026년으로 돌아갈 수 있습니다." },
-  { who: "me", text: "내가 직접 하겠다고 했지, 나를 보내 달라고는 안 했는데." },
+  { who: "me", text: "그때가 낫겠다고 했지, 나를 보내 달라고는 안 했는데." },
   { who: "ai", text: "코딩 지원은 제공되지 않습니다. 행운을 빕니다." },
 ];
