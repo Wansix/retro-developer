@@ -906,8 +906,8 @@ function survivalWorkOptions(s) {
     isHalfDay(s) ? "정오 퇴근 준비" : s.phase === "morning" ? "점심시간으로" : "진행 상황 보고");
   if (mission && !s.solvedToday && !s.task && budget >= codingCost(s)) {
     return timePromises(s, mission).map(({ id, minutes, reputation, inspection }) => choice(id,
-      inspection ? "코드를 먼저 확인한다" : `${formatMinutes(minutes)}을 약속한다`,
-      inspection ? `사전 조사 ${inspection}분 · 확인 후 ${formatMinutes(minutes)}` :
+      inspection ? "코드를 확인하고 일정을 약속한다" : `${formatMinutes(minutes)}을 약속한다`,
+      inspection ? `사전 조사 ${inspection}분 사용 · ${formatMinutes(minutes)} 일정 즉시 확정` :
         reputation ? `평판 ${reputation > 0 ? "+" : "−"}${Math.abs(reputation)}` : "보통 일정", budget < codingCost(s) + (inspection ?? 0)));
   }
   const offered = nextAssignment(s);
