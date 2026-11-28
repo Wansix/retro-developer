@@ -45,11 +45,14 @@ export function dialogueText(id, fallback, vars = {}) {
 }
 
 export function editedScript(id, original) {
-  return original.map((step, index) => ({
-    ...step,
-    text: dialogueText(`${id}.${index}`, step.text),
-    ...(step.before ? { before: dialogueText(`${id}.${index}.before`, step.before) } : {}),
-  }));
+  return original.map((step, index) => {
+    const key = `${id}.${step.id ?? index}`;
+    return {
+      ...step,
+      text: dialogueText(key, step.text),
+      ...(step.before ? { before: dialogueText(`${key}.before`, step.before) } : {}),
+    };
+  });
 }
 
 if (typeof window !== "undefined") {

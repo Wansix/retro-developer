@@ -1,6 +1,6 @@
 import { INTERNET_ALERTS, LECTURE_LINES, SELF_FIXED_REACTION } from "./intranet-feed.js";
 import { COMDORI_LINES, COMDORI_STANDBY, SURVIVAL_TUTORIAL_LINES, TUTORIAL_LINES } from "./comdori-lines.js";
-import { BOSS_LINES, MISSIONS, PASTE_LINES, WRONG_RUN_LINES } from "./missions.js";
+import { BOSS_LINES, MISSIONS, PASTE_LINES, PROLOGUE_2026, SCENE_2006, TRAVEL_LINES, WRONG_RUN_LINES } from "./missions.js";
 import { DEPARTMENTS, EPILOGUE, LUNCH } from "./office-content.js";
 import { CLOCK_REPLIES, MINE_REPLIES, OFFICE_COPY } from "./office-copy.js";
 import { PRESENCE_LINES } from "./office-presence.js";
@@ -13,7 +13,7 @@ export const GROUPS = {
   companion: "컴돌이",
   reaction: "행동 감지·반응",
 };
-const SPEAKERS = { ...CAST_NAMES, ai: "컴돌이" };
+const SPEAKERS = { ...CAST_NAMES, ai: "컴돌이", check: "플레이어 확인 버튼", terminal: "터미널" };
 const CHOICES = { park: "박 대리와 점심", help: "이 대리 도움", kim: "김 과장과 점심", yes: "수락", no: "불가능", trim: "범위 축소", joke: "영업팀 농담", accept: "요청 수락", document: "서면 정리", push: "거절·일정 협상", ally: "담당자와 공동 대응" };
 const TUTORIALS = { time: "업무 시간", input: "첫 코드 입력", submit: "업무 제출", score: "평판 보상", practice: "문법 업무", health: "체력", stress: "스트레스", trust: "보고 신뢰도", scope: "추가 일감", deadline: "마감" };
 const COMPANION_EVENTS = {
@@ -39,16 +39,22 @@ const entry = (id, group, context, who, texts, note = "") =>
   ({ id, group, context, speaker: SPEAKERS[who] ?? who, texts: Array.isArray(texts) ? texts : [texts], note });
 const scene = (id, group, context, lines) => lines.map(([who, text], i) =>
   entry(`${id}.${i}`, group, lines.length > 1 ? `${context} · ${i + 1}번째` : context, who, text));
-const script = (id, context, steps) => steps.flatMap(({ who, text, before }, i) => [
-  ...(before ? [entry(`${id}.${i}.before`, "intro", `${context} · ${i + 1}번째 작업 전`, who, before)] : []),
-  entry(`${id}.${i}`, "intro", `${context} · ${i + 1}번째`, who, text),
-]);
+const script = (id, context, steps) => steps.flatMap(({ id: stepId, who, text, before }, i) => {
+  const key = `${id}.${stepId ?? i}`;
+  return [
+    ...(before ? [entry(`${key}.before`, "intro", `${context} · ${i + 1}번째 작업 전`, who, before)] : []),
+    entry(key, "intro", `${context} · ${i + 1}번째`, who, text),
+  ];
+});
 
 export const DIALOGUE_CATALOGUE = [
   ...Object.entries(OFFICE_COPY).map(([id, [context, who, text]]) =>
     entry("office." + id, id.startsWith("opening") ? "intro" : "office", context, who, text,
       text.includes("{") ? "중괄호 속 이름은 플레이할 때 실제 값으로 바뀝니다." : "")),
+  ...script("intro", "2026년 · 에이전트와 로그인 작업", PROLOGUE_2026),
+  ...script("wake", "2006년 · 김 과장이 깨우는 장면", SCENE_2006),
   ...script("epilogue", "2026년 귀환 · 에필로그", EPILOGUE),
+  ...TRAVEL_LINES.map((line, i) => entry("travel." + i, "intro", `시간 이동 · 로그 ${i + 1}`, "terminal", line)),
   ...MISSIONS.map(mission => entry("mission." + mission.id, "office", `업무 배정 · ${mission.title}`, "boss", mission.boss)),
   ...Object.entries(BOSS_LINES).map(([id, text]) => entry("boss." + id, "reaction", BOSS_EVENTS[id], "boss", text,
     id === "leave" ? "" : "상황에 따라 생성 대사가 먼저 쓰일 수 있습니다. 여기는 기본 대사입니다.")),

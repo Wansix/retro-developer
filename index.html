@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
 <title>옛날 개발자 v0.11.0 — 퇴근하고 싶다</title>
-<link rel="stylesheet" href="src/style.css?v=48">
+<link rel="stylesheet" href="src/style.css?v=50">
 </head>
 <body>
   <!-- 타이틀 -->
@@ -22,21 +22,36 @@
     </div>
   </section>
 
+  <section id="screen-intro-thought" class="screen" aria-labelledby="intro-thought-time">
+    <div class="intro-thought">
+      <h1 id="intro-thought-time" tabindex="-1">2026년 · 퇴근 2분 전</h1>
+      <p id="intro-thought-line"></p>
+      <button id="intro-start-agent" class="btn primary hidden" type="button">컴돌이 켜기 <span aria-hidden="true">→</span></button>
+    </div>
+  </section>
+
   <!-- 프롤로그 2026: AI와의 설전 -->
   <section id="screen-intro" class="screen" aria-labelledby="intro-title">
     <div class="intro-workbench">
-      <section id="intro-preview" class="intro-preview" aria-labelledby="intro-preview-title">
+      <section id="intro-preview" class="intro-preview hidden" aria-labelledby="intro-preview-title">
         <header class="intro-preview-toolbar">
           <h2 id="intro-preview-title">미리보기</h2>
           <code id="intro-preview-address">localhost:3000/login</code>
         </header>
         <div class="intro-preview-page">
+          <div class="intro-shop-nav">
+            <strong>밤마켓</strong>
+            <div class="intro-preview-cart" aria-live="polite">
+              <span id="intro-preview-cart">장바구니 2개</span>
+              <small id="intro-preview-cart-detail">쿠폰 5,000원 할인</small>
+            </div>
+          </div>
           <div class="intro-preview-login">
-            <h3>밤마켓 로그인</h3>
+            <h3>로그인</h3>
             <div class="intro-preview-field">이메일 <span>demo@example.test</span></div>
             <div class="intro-preview-field">비밀번호 <span>••••••••</span></div>
             <button id="intro-preview-login" type="button">로그인</button>
-            <p id="intro-preview-error" role="status"></p>
+            <p id="intro-preview-error" role="status" hidden>이메일 또는 비밀번호를 확인해 주세요.</p>
           </div>
         </div>
       </section>
@@ -55,9 +70,41 @@
           <code>~/work/shop-web <span>main</span></code>
           <p id="intro-status" role="status">내 차례</p>
         </div>
-        <div id="intro-transcript" role="log" aria-label="컴돌이와의 대화" tabindex="0"></div>
+        <div id="intro-transcript" role="log" aria-label="터미널 작업 기록" tabindex="0"></div>
       </div>
-      <button id="btn-gotowork" class="btn primary hidden" type="button">첫 출근하기</button>
+      <button id="intro-speak" class="hidden" type="button">
+        <span class="intro-cta-copy">
+          <span id="intro-speak-label">입력 대기</span>
+          <strong id="intro-speak-text"></strong>
+        </span>
+        <span class="prologue-cta-action"><span id="intro-speak-action">지시 보내기</span> <span aria-hidden="true">→</span></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- 시간 이동: 글리치 + 터미널 -->
+  <section id="screen-travel" class="screen">
+    <div id="travel-box">
+      <pre id="travel-log"></pre>
+    </div>
+  </section>
+
+  <!-- 2006년 첫 출근 -->
+  <section id="screen-2006" class="screen">
+    <div class="terminal chat retro">
+      <p class="line dim">2006년 3월, 미래소프트™</p>
+      <div id="chat-log-2006"></div>
+      <div id="buttons-2006"></div>
+    </div>
+  </section>
+
+  <!-- 타이틀 카드 -->
+  <section id="screen-titlecard" class="screen">
+    <div class="titlecard">
+      <h1 class="bigtitle">옛날 개발자 <span class="game-version">v0.11.0</span></h1>
+      <p class="tagline">미래소프트™ 개발 3팀</p>
+      <p class="tagline2">코딩은 쉬운데 퇴근이 어려운 게임.</p>
+      <button id="btn-gotowork" class="btn primary">첫 출근하기</button>
     </div>
   </section>
 
@@ -425,6 +472,6 @@
       <button id="records-back" class="btn">돌아가기</button>
     </div>
   </section>
-  <script type="module" src="src/main.js?v=48"></script>
+  <script type="module" src="src/main.js?v=50"></script>
 </body>
 </html>

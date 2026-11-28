@@ -185,3 +185,45 @@ export const WRONG_RUN_LINES = [
   "컴퓨터는 시킨 대로 했어. 우리가 뭘 시켰는지부터 보자.",
   "이대로 QA에 넘기면 다시 돌아온다. 이제 입력이랑 결과를 나란히 놓고 봐.",
 ];
+
+// 프롤로그 2026년: 플레이어는 me 대사를 보내거나 check의 미리보기 테스트를 실행한다.
+export const PROLOGUE_2026 = [
+  { id: "0", who: "me", text: "지금 로그인 화면부터 띄워줘." },
+  { id: "1", who: "ai", text: "현재 로그인 화면입니다.", preview: "baseline" },
+  { id: "2", who: "me", text: "로그인 실패 문구만 버튼 바로 밑에 띄워줘. 디자인은 그대로 둬." },
+  { id: "login-fixed", who: "ai", text: "수정 완료했습니다. 테스트는 12개 통과했습니다. 로그인 버튼을 눌러 확인해 주세요.",
+    tools: [
+      { command: "npm test -- login.test.ts", output: "PASS  src/auth/login.test.ts\nTests: 12 passed, 12 total", tone: "pass" },
+    ] },
+  { id: "11", who: "check", target: "login", preview: "sessionError", text: "에이전트 말대로 로그인 눌러보기" },
+  { id: "login-complaint", who: "me", text: "이거 아니잖아. 로그인 눌렀는데 또 로그인하래." },
+  { id: "button-defense", who: "ai", text: "버튼은 정상 작동했습니다." },
+  { id: "takeover", who: "me", text: "됐어. 너 없던 시절처럼 내가 할게." },
+  { id: "20", who: "ai", text: "알겠습니다. 요청하신 개발 환경을 준비하겠습니다.",
+    tools: [
+      { command: "workspace switch --year 2006", output: "✓  2006년 개발 환경 준비 완료\n…  현재 세션 연결 종료 대기", tone: "warn" },
+    ] },
+  { id: "21", who: "me", text: "뭐?" },
+];
+
+export const TRAVEL_LINES = [
+  "Initializing development environment...",
+  "AI Assistant: DISABLED",
+  "Target Year: 2006",
+  "Time Travel: COMPLETE",
+];
+
+// 2006년 첫 출근: boss = 김 과장, ai = 모니터에 뜬 미래의 AI 메시지.
+export const SCENE_2006 = [
+  { who: "boss", text: "신입! 야, 일어나 봐. 내 말 들려?" },
+  { who: "me", text: "네… 여기가 어디죠?" },
+  { who: "boss", text: "미래소프트 개발 3팀. 나 김 과장이야. 오늘 오기로 한 신입, 너 맞지?" },
+  { who: "me", text: "제가요? 잠깐만요. 저 방금까지 제 자리에서…" },
+  { who: "boss", text: "아직 덜 깼네. 물 저기 있으니까 한 잔 하고 와. 네 자리는 이쪽이야." },
+  { who: "boss", text: "쇼핑몰 프로젝트에 손이 모자라. 자리 잡으면 첫 업무부터 줄게." },
+  { who: "me", text: "잠깐, 모니터에 저거… 컴돌이?" },
+  { who: "ai", text: "연결됐습니다. 지금은 2006년 3월입니다." },
+  { who: "ai", text: "두 번째 토요일이 납품일입니다. 12근무일 안에 쇼핑몰을 완성하면 2026년으로 돌아갈 수 있습니다." },
+  { who: "me", text: "그때가 낫겠다고 했지, 나를 보내 달라고는 안 했는데." },
+  { who: "ai", text: "코딩 지원은 제공되지 않습니다. 행운을 빕니다." },
+];

@@ -3,7 +3,7 @@ import { mountAssembly } from "./code-assembly-ui.js";
 import { isPlayMode, PLAY_MODES, playMode } from "./play-mode.js";
 import { CLOCK_REPLIES, MINE_REPLIES, officeCopy } from "./office-copy.js";
 import { dialoguePool, dialogueText, editedScript, loadDialogueOverrides } from "./dialogue-overrides.js";
-import { BOSS_LINES, MISSIONS, PASTE_LINES, WRONG_RUN_LINES } from "./missions.js";
+import { BOSS_LINES, MISSIONS, PASTE_LINES, SCENE_2006, TRAVEL_LINES, WRONG_RUN_LINES } from "./missions.js";
 import { DEPARTMENTS, ENDINGS, EPILOGUE } from "./office-content.js";
 import { CAST_NAMES, editedScene, officeScene } from "./office-scenes.js";
 import {
@@ -23,7 +23,7 @@ import { mountOfficeCompanion } from "./comdori-companion.js";
 import { FIRST_RULESET, METRICS, RULESET, PROJECT_WORKDAYS, TOTAL_DAYS, formatDate, formatMetric, formatMinutes, internetRecordRows } from "./records-schema.js";
 import { SCRUM_REPORTS } from "./scrum.js";
 import { initRecords, openRecords, syncRecord } from "./records.js";
-import { dialogueLine, initDialogueSound, playDeadlineCue, playFootsteps } from "./dialogue.js";
+import { dialogueLine, initDialogueSound, playDeadlineCue, playFootsteps, typeDialogue } from "./dialogue.js";
 import { playIntro } from "./intro.js";
 import { OPENING_WORK, PROJECT_GOAL } from "./project-work.js";
 import { LANGUAGES } from "./office-languages.js";
@@ -82,17 +82,18 @@ function show(id) {
   minesWindow.sync();
 }
 
-// --- 에필로그: 스크립트 러너 ---
+// --- 프롤로그: 스크립트 러너 ---
 const WHO_LABEL = { me: "나", ai: "컴돌이", boss: "김 과장" };
 
 async function addChatTo(logId, text, who) {
   const log = $(logId);
+  const firstDay = logId === "chat-log-2006";
   const div = document.createElement("div");
   div.className = `bubble ${who === "me" ? "player" : who}`;
   let portrait;
-  if (who === "ai") {
+  if (who === "ai" || (firstDay && who === "boss")) {
     portrait = document.createElement("span");
-    portrait.className = "comdori-avatar";
+    portrait.className = who === "ai" ? "comdori-avatar" : "kim-avatar";
     portrait.dataset.action = "talking";
     portrait.setAttribute("aria-hidden", "true");
     div.classList.add("with-portrait");
@@ -105,14 +106,43 @@ async function addChatTo(logId, text, who) {
   copy.append(label);
   div.append(copy);
   log.appendChild(div);
+  if (firstDay && who === "boss" && log.childElementCount === 1 && !officeReducedMotion.matches) {
+    log.parentElement.animate([
+      { transform: "translate(0, 0)" },
+      { transform: "translate(-7px, 3px)" },
+      { transform: "translate(6px, -2px)" },
+      { transform: "translate(-4px, 1px)" },
+      { transform: "translate(2px, 0)" },
+      { transform: "translate(0, 0)" },
+    ], { duration: 320, easing: "ease-out" });
+  }
+  if (firstDay && who === "me") {
+    copy.append(text);
+    log.scrollTop = log.scrollHeight;
+    return;
+  }
   await dialogueLine(copy, text, {
     voice: who,
+    ...(firstDay ? { letterMs: 64, maxMs: 2400 } : {}),
     onFrame: () => { log.scrollTop = log.scrollHeight; },
   });
   if (portrait) portrait.dataset.action = "still";
 }
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function typeAgentLogs(lines, termId, linePause) {
+  const term = $(termId);
+  for (const [index, fallback] of lines.entries()) {
+    const line = dialogueText("travel." + index, fallback);
+    const letters = document.createTextNode("");
+    term.append(letters, "\n");
+    await typeDialogue(letters, line, {
+      voice: "terminal", letterMs: 14, onFrame: () => { term.scrollTop = term.scrollHeight; },
+    });
+    await pause(linePause);
+  }
+}
 
 function runScript(steps, logId, btnsId, onDone) {
   let i = 0;
@@ -125,7 +155,19 @@ function runScript(steps, logId, btnsId, onDone) {
       box.innerHTML = "";
       const b = document.createElement("button");
       b.className = "btn";
-      b.textContent = step.text;
+      if (logId === "chat-log-2006") {
+        b.classList.add("scene-reply");
+        const reply = document.createElement("span");
+        reply.textContent = step.text;
+        const action = document.createElement("span");
+        action.className = "prologue-cta-action";
+        action.textContent = "대답하기";
+        const arrow = document.createElement("span");
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.textContent = " →";
+        action.append(arrow);
+        b.append(reply, action);
+      } else b.textContent = step.text;
       b.onclick = async () => {
         box.innerHTML = "";
         await addChatTo(logId, step.text, "me");
@@ -139,6 +181,26 @@ function runScript(steps, logId, btnsId, onDone) {
     }
   }
   next();
+}
+
+async function startTravel() {
+  show("screen-travel");
+  $("travel-log").replaceChildren();
+  await typeAgentLogs(TRAVEL_LINES, "travel-log", 300);
+  setTimeout(enter2006, 500);
+}
+
+function markIntroSeen() {
+  try { localStorage.setItem("retro-intro-seen", "1"); } catch { /* 무시 */ }
+}
+
+function enter2006() {
+  show("screen-2006");
+  document.getElementById("chat-log-2006").innerHTML = "";
+  runScript(editedScript("wake", SCENE_2006), "chat-log-2006", "buttons-2006", () => {
+    markIntroSeen();
+    setTimeout(() => show("screen-titlecard"), 900);
+  });
 }
 
 function loadLocal(key) {
@@ -1287,9 +1349,22 @@ function title() {
     legacy ? `이전 10일판 최고 기록 · ${legacy.score}점 · ${legacy.ending}` : "";
 }
 
-$("btn-start").onclick = () => {
+$("btn-start").onclick = async () => {
+  const thought = $("intro-thought-line");
+  const startAgent = $("intro-start-agent");
+  thought.replaceChildren();
+  startAgent.classList.add("hidden");
+  show("screen-intro-thought");
+  $("intro-thought-time").focus({ preventScroll: true });
+  await dialogueLine(thought, officeCopy("openingThought"), {
+    voice: "me", letterMs: 42, maxMs: 1250,
+  });
+  startAgent.classList.remove("hidden");
+};
+$("intro-start-agent").onclick = () => {
   show("screen-intro");
-  playIntro();
+  $("intro-title").focus({ preventScroll: true });
+  playIntro(startTravel);
 };
 let modeSpeech;
 
@@ -1327,10 +1402,7 @@ $("mode-form").onsubmit = async event => {
   await pause(500);
   enterOffice(true, run);
 };
-$("btn-gotowork").onclick = () => {
-  try { localStorage.setItem("retro-intro-seen", "1"); } catch { /* A restricted browser can still play in memory. */ }
-  showModePicker();
-};
+$("btn-gotowork").onclick = showModePicker;
 $("btn-skip-intro").onclick = showModePicker;
 $("btn-resume").onclick = () => enterOffice(true);
 $("btn-restart").onclick = showModePicker;
