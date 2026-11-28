@@ -672,6 +672,10 @@ function phaseStory() {
 function firstDayLesson() {
   if (!isTutorial(state)) return null;
   if (hasOfficeClock(state) && state.phase === "lunch") return officeCopy("firstLunch");
+  if (hasOfficeClock(state) && (state.phase === "afternoon" || state.phase === "report") &&
+      state.workDoneToday > 0 && !state.activeWork && !nextAssignment(state) && !state.scope) {
+    return officeCopy(state.phase === "afternoon" ? "firstAfternoonComplete" : "firstReportComplete");
+  }
   if (state.phase === "leave") return officeCopy("firstLeave");
   if (state.phase === "overtime" && state.moves.at(-1) === "stay") {
     return officeCopy("firstOvertime");
